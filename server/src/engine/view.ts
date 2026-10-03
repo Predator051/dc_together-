@@ -1,8 +1,9 @@
-import type { ChoiceNode, PlayerId, SceneDef } from '../../../shared/src/content.js';
+import type { ActionDef, ChoiceNode, Effect, PlayerId, PoolActionDef, SceneDef } from '../../../shared/src/content.js';
 import type {
   ClueView,
   CostView,
   EntryView,
+  GainView,
   GroupView,
   LogView,
   OptionView,
@@ -15,12 +16,73 @@ import { resolveParas } from './text.js';
 
 const LOG_SEND = 120;
 
+/** The red cost line already explains a shortage, so the generic text is not repeated. */
+function shownReason(g: Game, reason: string | null): string | undefined {
+  if (!reason || reason === g.ix.ui('err_cost')) return undefined;
+  return reason;
+}
+
 function costView(g: Game, cost: Record<string, number> | undefined): CostView[] | undefined {
   if (!cost) return undefined;
   return Object.entries(cost).map(([id, n]) => {
     const have = g.s.res[id] ?? 0;
-    return { id, name: g.ix.res.get(id)?.name ?? id, n, have, ok: have >= n };
+    const def = g.ix.res.get(id);
+    return { id, name: def?.name ?? id, n, have, ok: have >= n, stock: !!def?.hidden };
   });
+}
+
+/** Describe what an action gives: exact amounts, ranges, or "+?" when it depends on luck. */
+function actionGains(g: Game, a: ActionDef, pid: PlayerId): GainView[] {
+  const out: GainView[] = [];
+  const seen = new Set<string>();
+  const visibleRes = (r: string) => {
+    const def = g.ix.res.get(r);
+    return def && !def.hidden ? def : null;
+  };
+  if (a.gives) out.push({ text: g.render(a.gives, pid) });
+  for (const [r, y] of Object.entries(a.yield ?? {})) {
+    const def = visibleRes(r);
+    if (!def) continue;
+    seen.add(r);
+    if (a.rollsPer) out.push({ text: `+? ${def.name}`, unsure: true });
+    else if (Array.isArray(y)) out.push({ text: `+${y[0]}–${y[1]} ${def.name}` });
+    else out.push({ text: `+${y} ${def.name}` });
+  }
+  const top: Effect[] = a.effects ?? [];
+  for (const e of top) {
+    if ('add' in e) {
+      for (const [r, n] of Object.entries(e.add)) {
+        const def = visibleRes(r);
+        if (!def || n <= 0 || seen.has(r)) continue;
+        seen.add(r);
+        out.push({ text: `+${n} ${def.name}` });
+      }
+    }
+    if ('stove' in e) out.push({ text: `+${Math.round((e.stove * g.ix.c.stove.perWood) / 60000)} ${g.ix.ui('gain_fire')}` });
+  }
+  for (const ch of a.chance ?? []) {
+    if (ch.if && !g.test(ch.if, pid)) continue;
+    for (const [r, n] of Object.entries(ch.add ?? {})) {
+      const def = visibleRes(r);
+      if (!def || n <= 0 || seen.has(r)) continue;
+      seen.add(r);
+      out.push({ text: `+? ${def.name}`, unsure: true });
+    }
+  }
+  for (const r of g.ix.c.resources) {
+    for (const b of r.capBonus ?? []) {
+      if ('flag' in b.if && b.if.flag === `built:${a.id}`) out.push({ text: `${r.name}: ${g.ix.ui('gain_space')} +${b.add}` });
+    }
+  }
+  if (out.length === 0 && ((a.effects?.length ?? 0) > 0 || (a.beats?.length ?? 0) > 0 || (a.chance?.length ?? 0) > 0)) {
+    out.push({ text: g.ix.ui('gain_unknown'), unsure: true });
+  }
+  return out;
+}
+
+function sceneGains(g: Game, def: SceneDef | PoolActionDef, pid: PlayerId): GainView[] {
+  if (def.gives) return [{ text: g.render(def.gives, pid) }];
+  return [{ text: g.ix.ui('gain_unknown'), unsure: true }];
 }
 
 function paras(g: Game, p: Parameters<typeof resolveParas>[0], pid: PlayerId): string[] {
@@ -42,8 +104,9 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
         kind: 'scene',
         label: g.render(sc.label, pid),
         enabled: reason === null,
-        reason: reason ?? undefined,
+        reason: shownReason(g, reason),
         cost: costView(g, sc.cost),
+        gain: sceneGains(g, sc, pid),
         together: true,
       });
     }
@@ -56,9 +119,10 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
         kind: 'pool',
         label: g.render(pool.label, pid),
         enabled: reason === null,
-        reason: reason ?? undefined,
+        reason: shownReason(g, reason),
         hint: pool.hint ? g.render(pool.hint, pid) : undefined,
         cost: costView(g, pool.cost),
+        gain: sceneGains(g, pool, pid),
         together: true,
       });
     }
@@ -72,9 +136,10 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
         kind: 'act',
         label: g.render(a.label, pid),
         enabled: reason === null,
-        reason: reason ?? undefined,
+        reason: shownReason(g, reason),
         hint: a.hint ? g.render(a.hint, pid) : undefined,
         cost: costView(g, a.cost),
+        gain: actionGains(g, a, pid),
         readyAt: cd > g.now ? cd : undefined,
         cooldown: Math.round(a.cooldown * g.cooldownMult()),
       });
@@ -219,10 +284,14 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
   const stoveState = g.stoveState();
   const stoveText = stoveState === 'never' ? '' : ui(`stove_${stoveState}`);
 
-  let partnerBusy: { text: string; until: number } | null = null;
+  let partnerBusy: { text: string; from: number; until: number } | null = null;
   if (o.busy && o.busy.until > g.now) {
     const a = g.ix.actions.get(o.busy.action);
-    if (a?.busy) partnerBusy = { text: g.render(a.busy, pid, other), until: o.busy.until };
+    if (a?.busy) {
+      const dur = Math.round(a.cooldown * g.cooldownMult());
+      const text = g.render(a.busy, pid, other);
+      partnerBusy = { text: text.charAt(0).toLowerCase() + text.slice(1), from: o.busy.until - dur, until: o.busy.until };
+    }
   }
 
   const pr = g.s.proposal;

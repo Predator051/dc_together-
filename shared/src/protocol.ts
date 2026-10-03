@@ -44,6 +44,14 @@ export interface CostView {
   have: number;
   ok: boolean;
   id: string;
+  /** Internal stock (cellar, scrap pile): show how much is left, not a price. */
+  stock?: boolean;
+}
+
+/** What a button gives. `unsure` = depends on luck or is unknown ("+?"). */
+export interface GainView {
+  text: string;
+  unsure?: boolean;
 }
 
 export interface EntryView {
@@ -54,6 +62,7 @@ export interface EntryView {
   hint?: string;
   reason?: string;
   cost?: CostView[];
+  gain?: GainView[];
   /** Server time (ms) when this player's cooldown ends. */
   readyAt?: number;
   cooldown?: number;
@@ -77,7 +86,7 @@ export interface PartnerView {
   role: Role | null;
   roleTitle: string;
   online: boolean;
-  busy: { text: string; until: number } | null;
+  busy: { text: string; from: number; until: number } | null;
   hp: number;
   hpMax: number;
 }

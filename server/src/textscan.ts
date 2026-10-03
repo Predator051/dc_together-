@@ -51,6 +51,7 @@ export function collectStrings(c: Content): Found[] {
     pushText(out, `act ${a.id}.label`, a.label);
     pushText(out, `act ${a.id}.busy`, a.busy);
     pushText(out, `act ${a.id}.hint`, a.hint);
+    pushText(out, `act ${a.id}.gives`, a.gives);
     pushText(out, `act ${a.id}.disabledHint`, a.disabledHint);
     pushLog(out, `act ${a.id}.log`, a.log);
     (a.chance ?? []).forEach((ch, i) => {
@@ -66,6 +67,7 @@ export function collectStrings(c: Content): Found[] {
   for (const p of c.pools) {
     pushText(out, `pool ${p.id}.label`, p.label);
     pushText(out, `pool ${p.id}.hint`, p.hint);
+    pushText(out, `pool ${p.id}.gives`, p.gives);
     pushText(out, `pool ${p.id}.disabledHint`, p.disabledHint);
   }
   for (const l of c.locations) {
@@ -76,6 +78,7 @@ export function collectStrings(c: Content): Found[] {
     pushText(out, `scene ${s.id}.title`, s.title);
     pushText(out, `scene ${s.id}.label`, s.label);
     pushText(out, `scene ${s.id}.disabledHint`, s.disabledHint);
+    pushText(out, `scene ${s.id}.gives`, s.gives);
     pushLog(out, `scene ${s.id}.summary`, s.summary);
     pushEffects(out, `scene ${s.id}.onEnd`, s.onEnd);
     for (const [id, n] of Object.entries(s.nodes)) {
@@ -181,7 +184,7 @@ export function checkUkrainian(text: string, allowLatin: RegExp[] = []): string[
   let bare = text.replace(PLACEHOLDER, (m) => (m.includes('|') ? m.slice(m.indexOf(':') >= 0 && m.startsWith('{p:') ? 3 : 1, m.indexOf('|')) || 'в' : 'Хтось'));
   for (const a of allowLatin) bare = bare.replace(a, '');
   if (/[{}|]/.test(bare)) problems.push('broken placeholder');
-  if (!UKR.test(bare) && bare.trim().length > 0) problems.push('no Ukrainian letters');
+  if (!UKR.test(bare) && /\p{L}/u.test(bare)) problems.push('no Ukrainian letters');
   if (RUSSIAN_LETTERS.test(bare)) problems.push('Russian letters');
   if (/[A-Za-z]/.test(bare)) problems.push('Latin letters');
   for (const r of RUSSISMS) if (r.test(bare)) problems.push(`russism ${r.source}`);

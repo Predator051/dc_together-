@@ -73,6 +73,7 @@ export const T = {
   hp: 'Сили',
   actDone: 'Кінець дії',
   sec: 'с',
+  have: 'є',
 };
 
 export type Strings = typeof T;

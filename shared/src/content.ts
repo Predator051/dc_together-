@@ -132,6 +132,8 @@ export interface ActionDef {
   log?: LogText | LogText[];
   /** Vignettes, each shown once (in order, skipping ones whose condition fails). */
   beats?: BeatDef[];
+  /** Extra "what you get" line for results the engine cannot describe (unlocks, upgrades). */
+  gives?: Text;
   hint?: Text;
   kind?: 'gather' | 'craft' | 'build' | 'home';
 }
@@ -146,6 +148,7 @@ export interface PoolActionDef {
   enabled?: Cond;
   disabledHint?: Text;
   cost?: Record<string, number>;
+  gives?: Text;
   hint?: Text;
 }
 
@@ -224,6 +227,8 @@ export interface SceneDef {
   enabled?: Cond;
   disabledHint?: Text;
   cost?: Record<string, number>;
+  /** What the scene gives; without it the button shows "+?". */
+  gives?: Text;
   /** Default true: once completed it disappears. */
   once?: boolean;
   /** Completing this scene marks the location as explored. */

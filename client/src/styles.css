@@ -418,8 +418,57 @@ p {
   font-size: 0.8rem;
   color: var(--muted);
 }
+.gain {
+  color: #b9d49a;
+}
+.gain.unsure {
+  color: var(--ember);
+}
+.cost {
+  color: var(--muted);
+}
 .cost.short {
   color: var(--blood);
+}
+.stock-left {
+  color: var(--dim);
+}
+.btn.act .secs {
+  position: relative;
+  z-index: 1;
+  font-size: 0.8rem;
+  color: var(--ember2);
+  white-space: nowrap;
+}
+.mini-bar {
+  display: inline-block;
+  width: 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: #2a2420;
+  overflow: hidden;
+  align-self: center;
+}
+.mini-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--frost);
+  transition: width 0.2s linear;
+}
+.me-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: transparent;
+}
+.me-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--ember);
+  box-shadow: 0 0 6px var(--ember);
+  transition: width 0.2s linear;
 }
 .hint {
   color: var(--dim);

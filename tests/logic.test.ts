@@ -233,3 +233,40 @@ describe('text templates', () => {
     expect(s.res['res_11']).toBe(12);
   });
 });
+
+describe('buttons say what they give and cost', () => {
+  it('exact gains, ranges, luck-based "+?", storage upgrades and leftover stock', () => {
+    const w = ready();
+    outOfCellar(w);
+    w.state.flags['seen:loc_07'] = 1;
+    w.state.flags['built:act_01'] = 1;
+    w.state.res['item_02'] = 1;
+    w.state.res['res_07'] = 3;
+    const entries = (pid: 'p1' | 'p2') => w.view(pid).groups.flatMap((g) => g.entries);
+    const find = (pid: 'p1' | 'p2', id: string) => entries(pid).find((e) => e.id === id)!;
+    const gains = (pid: 'p1' | 'p2', id: string) => find(pid, id).gain!.map((x) => `${x.text}${x.unsure ? '?' : ''}`);
+
+    expect(gains('p2', 'act_10')).toEqual(['+1 Дрова']);
+    expect(gains('p1', 'act_27')).toEqual(['+2–3 Харчі', '+? Шкури?', '+? Жир?', '+? Стріли?']);
+    expect(gains('p1', 'act_03')).toEqual(['+??']);
+    expect(gains('p2', 'act_18')).toEqual(['Дрова: місце +20']);
+    expect(gains('p1', 'act_02')).toEqual(['+4 хв вогню']);
+    const cellar = find('p1', 'act_13').cost!;
+    expect(cellar[0]).toMatchObject({ stock: true, have: 12 });
+    const supper = find('p1', 'pool_01');
+    expect(supper.gain![0]!.text).toContain('Новий день');
+    expect(supper.cost!.map((c) => c.name)).toEqual(['Харчі', 'Вода']);
+    const scene = find('p1', 'scn_02');
+    expect(scene.gain).toEqual([{ text: '+?', unsure: true }]);
+  });
+
+  it('partner progress is visible while they work', () => {
+    const w = ready();
+    outOfCellar(w);
+    w.cmd('p2', { c: 'act', id: 'act_10' });
+    const busy = w.view('p1').partner.busy!;
+    expect(busy.text).toBe('рубає дрова');
+    expect(busy.until - busy.from).toBe(6000);
+    expect(w.view('p2').busyUntil - w.view('p2').busyFrom).toBe(6000);
+  });
+});

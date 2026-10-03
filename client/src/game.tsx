@@ -33,14 +33,23 @@ function store(key: string, value: string): void {
   }
 }
 
+function secsLeft(until: number, now: number): string {
+  return `${Math.max(1, Math.ceil((until - now) / 1000))} ${T.sec}`;
+}
+
+function progress(from: number, until: number, now: number): number {
+  if (until <= from) return 0;
+  return Math.max(0, Math.min(1, (now - from) / (until - from)));
+}
+
 function Entry({ e, v, now }: { e: EntryView; v: PlayerView; now: number }) {
   const busy = v.busyUntil > now;
   const mine = v.busyAction === e.id && busy;
   const recharge = e.readyAt && e.readyAt > now ? e.readyAt : 0;
   const disabled = !e.enabled || (e.kind === 'act' && (busy || !!recharge));
-  let progress = 0;
-  if (mine && v.busyUntil > v.busyFrom) progress = (now - v.busyFrom) / (v.busyUntil - v.busyFrom);
-  const reason = e.enabled ? (recharge ? `${Math.ceil((recharge - now) / 1000)} ${T.sec}` : null) : e.reason;
+  const reason = e.enabled ? (recharge ? secsLeft(recharge, now) : null) : e.reason;
+  const gains = e.gain ?? [];
+  const costs = e.cost ?? [];
 
   return (
     <div class={`entry ${e.together ? 'together' : ''}`}>
@@ -49,17 +58,27 @@ function Entry({ e, v, now }: { e: EntryView; v: PlayerView; now: number }) {
         disabled={disabled}
         onClick={() => net.send({ c: 'act', id: e.id })}
       >
-        {mine && <span class="fill" style={{ width: `${Math.min(100, progress * 100)}%` }} />}
+        {mine && <span class="fill" style={{ width: `${progress(v.busyFrom, v.busyUntil, now) * 100}%` }} />}
         <span class="label">{e.label}</span>
-        {e.together && <span class="tag">{T.together}</span>}
+        {mine ? <span class="secs">{secsLeft(v.busyUntil, now)}</span> : e.together && <span class="tag">{T.together}</span>}
       </button>
-      {(e.cost || reason || e.hint) && (
+      {(gains.length > 0 || costs.length > 0 || reason || e.hint) && (
         <div class="entry-meta">
-          {e.cost?.map((c) => (
-            <span class={`cost ${c.ok ? '' : 'short'}`}>
-              {c.name} {c.n}
-            </span>
+          {gains.map((x) => (
+            <span class={`gain ${x.unsure ? 'unsure' : ''}`}>{x.text}</span>
           ))}
+          {costs.map((c) =>
+            c.stock ? (
+              <span class="stock-left">
+                {c.name}: {c.have}
+              </span>
+            ) : (
+              <span class={`cost ${c.ok ? '' : 'short'}`}>
+                −{c.n} {c.name}
+                {!c.ok && ` (${T.have} ${c.have})`}
+              </span>
+            ),
+          )}
           {reason && <span class="reason">{reason}</span>}
           {!reason && e.hint && <span class="hint">{e.hint}</span>}
         </div>
@@ -121,13 +140,19 @@ function Stock({ v }: { v: PlayerView }) {
 function Partner({ v, now }: { v: PlayerView; now: number }) {
   const p = v.partner;
   if (!p.joined) return <div class="partner muted">{T.partnerNone}</div>;
-  const status = !p.online ? T.partnerOffline : p.busy && p.busy.until > now ? p.busy.text : T.partnerIdle;
+  const working = p.online && p.busy && p.busy.until > now ? p.busy : null;
+  const status = !p.online ? T.partnerOffline : working ? working.text : T.partnerIdle;
   return (
     <div class={`partner ${p.online ? 'on' : 'off'}`}>
       <span class="dot" />
       <b>{p.name}</b>
       <span class="muted">{p.roleTitle ? ` · ${p.roleTitle}` : ''}</span>
       <span class="status">{status}</span>
+      {working && (
+        <span class="mini-bar" aria-hidden="true">
+          <span style={{ width: `${progress(working.from, working.until, now) * 100}%` }} />
+        </span>
+      )}
     </div>
   );
 }
@@ -246,6 +271,11 @@ export function Game({ s }: { s: NetState }) {
           </div>
         )}
         {!s.connected && <div class="warn-bar">{T.reconnecting}</div>}
+        {v.busyUntil > now && (
+          <div class="me-progress" aria-hidden="true">
+            <span style={{ width: `${progress(v.busyFrom, v.busyUntil, now) * 100}%` }} />
+          </div>
+        )}
         <nav class="tabs only-mobile">
           <button class={tab === 'work' ? 'on' : ''} onClick={() => setTab('work')}>
             {T.tabWork}

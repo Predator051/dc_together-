@@ -23,6 +23,9 @@ export const ui: Record<string, string> = {
   proposal_theirs: '{partner} кличе тебе:',
 
   only: 'Лише',
+  gain_unknown: '+?',
+  gain_fire: 'хв вогню',
+  gain_space: 'місце',
   pick_you: 'Ти',
   pick_partner: '{partner}',
   pick_both: 'Ви обоє',

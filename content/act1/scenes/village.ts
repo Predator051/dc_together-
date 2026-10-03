@@ -381,6 +381,7 @@ export const villageScenes: SceneDef[] = [
     title: 'Дзвін',
     group: L.square,
     label: 'Повісити серця дзвонів разом',
+    gives: 'Дзвони знову заговорять',
     visible: { res: R.tongues, gte: 1 },
     cost: { [R.tongues]: 1, [R.iron]: 4, [R.hide]: 3, [R.wood]: 6 },
     start: 'n1',
