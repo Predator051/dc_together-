@@ -7,15 +7,47 @@ import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
 
-function useNow(offset: number, active: boolean): number {
-  const [now, setNow] = useState(Date.now() + offset);
+/** A button unlocks this long after the server says it may (absorbs clock jitter). */
+const SAFETY_MS = 150;
+
+/**
+ * Current server time. Instead of ticking constantly, the component re-renders exactly when
+ * something visible changes: a countdown second rolls over or a lock ends. Progress bars are
+ * pure CSS animations, so they run at the display's refresh rate without re-rendering.
+ */
+function useServerClock(offset: number, moments: number[]): number {
+  const [, force] = useState(0);
+  const now = Date.now() + offset;
   useEffect(() => {
-    setNow(Date.now() + offset);
-    if (!active) return;
-    const id = window.setInterval(() => setNow(Date.now() + offset), 200);
-    return () => window.clearInterval(id);
-  }, [offset, active]);
+    let dt = Infinity;
+    for (const t of moments) {
+      const left = t - now;
+      if (left <= 0) continue;
+      dt = Math.min(dt, left, left % 1000 || 1000);
+    }
+    if (!Number.isFinite(dt)) return;
+    const id = window.setTimeout(() => force((x) => x + 1), dt + 10);
+    return () => window.clearTimeout(id);
+  });
+  useEffect(() => {
+    const onShow = () => force((x) => x + 1);
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
   return now;
+}
+
+/**
+ * Progress fill animated by CSS (transform: scaleX), started from the current fraction.
+ * Re-key it by `until` so a new task starts a fresh animation.
+ */
+function Fill({ from, until, offset, cls }: { from: number; until: number; offset: number; cls: string }) {
+  const [start] = useState(() => {
+    const now = Date.now() + offset;
+    const span = Math.max(1, until - from);
+    return { p: Math.max(0, Math.min(1, (now - from) / span)), left: Math.max(0, until - now) };
+  });
+  return <span class={`anim-fill ${cls}`} style={{ '--p0': String(start.p), animationDuration: `${start.left}ms` }} />;
 }
 
 function load(key: string): string | null {
@@ -37,16 +69,19 @@ function secsLeft(until: number, now: number): string {
   return `${Math.max(1, Math.ceil((until - now) / 1000))} ${T.sec}`;
 }
 
-function progress(from: number, until: number, now: number): number {
-  if (until <= from) return 0;
-  return Math.max(0, Math.min(1, (now - from) / (until - from)));
+interface Ctx {
+  v: PlayerView;
+  now: number;
+  offset: number;
+  locked: boolean;
 }
 
-function Entry({ e, v, now }: { e: EntryView; v: PlayerView; now: number }) {
-  const busy = v.busyUntil > now;
-  const mine = v.busyAction === e.id && busy;
-  const recharge = e.readyAt && e.readyAt > now ? e.readyAt : 0;
-  const disabled = !e.enabled || (e.kind === 'act' && (busy || !!recharge));
+function Entry({ e, c }: { e: EntryView; c: Ctx }) {
+  const { v, now } = c;
+  const busy = v.busyUntil + SAFETY_MS > now;
+  const mine = v.busyAction === e.id && v.busyUntil > now;
+  const recharge = e.readyAt && e.readyAt + SAFETY_MS > now ? e.readyAt : 0;
+  const disabled = c.locked || !e.enabled || (e.kind === 'act' && (busy || !!recharge));
   const reason = e.enabled ? (recharge ? secsLeft(recharge, now) : null) : e.reason;
   const gains = e.gain ?? [];
   const costs = e.cost ?? [];
@@ -58,7 +93,7 @@ function Entry({ e, v, now }: { e: EntryView; v: PlayerView; now: number }) {
         disabled={disabled}
         onClick={() => net.send({ c: 'act', id: e.id })}
       >
-        {mine && <span class="fill" style={{ width: `${progress(v.busyFrom, v.busyUntil, now) * 100}%` }} />}
+        {mine && <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={c.offset} cls="fill" />}
         <span class="label">{e.label}</span>
         {mine ? <span class="secs">{secsLeft(v.busyUntil, now)}</span> : e.together && <span class="tag">{T.together}</span>}
       </button>
@@ -87,14 +122,14 @@ function Entry({ e, v, now }: { e: EntryView; v: PlayerView; now: number }) {
   );
 }
 
-function Group({ g, v, now }: { g: GroupView; v: PlayerView; now: number }) {
+function Group({ g, c }: { g: GroupView; c: Ctx }) {
   return (
     <section class={`card group ${g.base ? 'base' : ''}`}>
       <h3>{g.name}</h3>
       {g.desc && <p class="desc">{g.desc}</p>}
       <div class="entries">
         {g.entries.map((e) => (
-          <Entry key={e.id} e={e} v={v} now={now} />
+          <Entry key={e.id} e={e} c={c} />
         ))}
       </div>
     </section>
@@ -137,7 +172,7 @@ function Stock({ v }: { v: PlayerView }) {
   );
 }
 
-function Partner({ v, now }: { v: PlayerView; now: number }) {
+function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: number }) {
   const p = v.partner;
   if (!p.joined) return <div class="partner muted">{T.partnerNone}</div>;
   const working = p.online && p.busy && p.busy.until > now ? p.busy : null;
@@ -150,7 +185,7 @@ function Partner({ v, now }: { v: PlayerView; now: number }) {
       <span class="status">{status}</span>
       {working && (
         <span class="mini-bar" aria-hidden="true">
-          <span style={{ width: `${progress(working.from, working.until, now) * 100}%` }} />
+          <Fill key={working.until} from={working.from} until={working.until} offset={offset} cls="" />
         </span>
       )}
     </div>
@@ -219,8 +254,13 @@ function Log({ v }: { v: PlayerView }) {
 export function Game({ s }: { s: NetState }) {
   const v = s.view!;
   const [tab, setTab] = useState<Tab>((load('bezgomin.tab') as Tab) || 'work');
-  const counting = v.busyUntil > Date.now() + s.offset || v.groups.some((g) => g.entries.some((e) => e.readyAt)) || !!v.partner.busy;
-  const now = useNow(s.offset, counting);
+  const moments: number[] = [v.busyUntil, v.busyUntil + SAFETY_MS];
+  for (const g of v.groups) for (const e of g.entries) if (e.readyAt) moments.push(e.readyAt, e.readyAt + SAFETY_MS);
+  if (v.partner.busy) moments.push(v.partner.busy.until);
+  const now = useServerClock(s.offset, moments);
+  // Pending clicks are swallowed in net.send (no visual flicker); a stale view locks visibly.
+  const locked = s.stale || !s.connected;
+  const ctx: Ctx = { v, now, offset: s.offset, locked };
   const seenClues = Number(load('bezgomin.clues') ?? '0');
   const newNotes = v.journal.clues.length > seenClues;
 
@@ -251,7 +291,7 @@ export function Game({ s }: { s: NetState }) {
         <Stock v={v} />
       </div>
       {groups.map((g) => (
-        <Group key={g.id} g={g} v={v} now={now} />
+        <Group key={g.id} g={g} c={ctx} />
       ))}
     </div>
   );
@@ -264,7 +304,7 @@ export function Game({ s }: { s: NetState }) {
           {v.me.role && <span class="muted small">{v.day > 0 ? `${T.day} ${v.day}` : ''}</span>}
           <span class={`net ${s.connected ? 'ok' : 'bad'}`} title={s.connected ? T.onlineDot : T.offlineDot} />
         </div>
-        <Partner v={v} now={now} />
+        <Partner v={v} now={now} offset={s.offset} />
         {v.goal && (
           <div class="goal">
             <span class="muted">{T.goal}:</span> {v.goal}
@@ -273,7 +313,7 @@ export function Game({ s }: { s: NetState }) {
         {!s.connected && <div class="warn-bar">{T.reconnecting}</div>}
         {v.busyUntil > now && (
           <div class="me-progress" aria-hidden="true">
-            <span style={{ width: `${progress(v.busyFrom, v.busyUntil, now) * 100}%` }} />
+            <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={s.offset} cls="" />
           </div>
         )}
         <nav class="tabs only-mobile">
@@ -317,7 +357,7 @@ export function Game({ s }: { s: NetState }) {
           {v.proposal.mine ? (
             <>
               <span>{v.proposal.text}</span>
-              <button class="btn small" onClick={() => net.send({ c: 'cancel' })}>
+              <button class="btn small" disabled={locked} onClick={() => net.send({ c: 'cancel' })}>
                 {T.cancel}
               </button>
             </>
@@ -327,10 +367,10 @@ export function Game({ s }: { s: NetState }) {
                 {v.proposal.text} <b>«{v.proposal.label}»</b>
               </span>
               <div class="row">
-                <button class="btn primary small" onClick={() => net.send({ c: 'accept' })}>
+                <button class="btn primary small" disabled={locked} onClick={() => net.send({ c: 'accept' })}>
                   {T.accept}
                 </button>
-                <button class="btn small" onClick={() => net.send({ c: 'decline' })}>
+                <button class="btn small" disabled={locked} onClick={() => net.send({ c: 'decline' })}>
                   {T.decline}
                 </button>
               </div>
@@ -339,7 +379,7 @@ export function Game({ s }: { s: NetState }) {
         </div>
       )}
 
-      {v.scene && <Scene v={v} sc={v.scene} />}
+      {v.scene && <Scene v={v} sc={v.scene} locked={locked} />}
       {s.toast && <div class="toast">{s.toast.text}</div>}
     </div>
   );

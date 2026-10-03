@@ -16,6 +16,7 @@ export type ClientMsg =
   | { t: 'join'; code: string; name: string; gender: Gender; role: Role }
   | { t: 'claim'; code: string; pid: PlayerId }
   | { t: 'cmd'; cmd: Command; seq?: number }
+  | { t: 'sync' }
   | { t: 'ping' };
 
 // ---------- Server -> client ----------

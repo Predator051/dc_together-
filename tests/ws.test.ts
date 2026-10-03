@@ -288,3 +288,16 @@ describe('two bot clients over WebSocket', () => {
     expect(b.view!.actDone?.act).toBe(1);
   });
 });
+
+describe('fresh state on request', () => {
+  it('sync returns the current view so a returning tab never shows stale buttons', async () => {
+    await boot();
+    const [a] = await pair();
+    const before = a.rev;
+    const v = a.wait('view');
+    a.send({ t: 'sync' });
+    const m = await v;
+    expect(m.rev).toBeGreaterThanOrEqual(before);
+    expect(m.v.me.name).toBe('Марко');
+  });
+});

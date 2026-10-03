@@ -57,7 +57,7 @@ docker compose logs game | grep "Invite code"
 Скопируйте новую версию на сервер (шаг 2), затем на сервере:
 
 ```bash
-cd ~/bezgomin/deploy && docker compose exec game node --experimental-sqlite dist/backup.js && docker compose up -d --build
+cd ~/bezgomin/deploy && docker compose exec game node dist/backup.js && docker compose up -d --build
 ```
 
 Первая часть команды делает резервную копию мира, вторая пересобирает и перезапускает игру. Ваш мир хранится в `deploy/data` и переживает обновления: вы продолжите с того места, где остановились.
@@ -67,7 +67,7 @@ cd ~/bezgomin/deploy && docker compose exec game node --experimental-sqlite dist
 Сделать копию вручную:
 
 ```bash
-cd ~/bezgomin/deploy && docker compose exec game node --experimental-sqlite dist/backup.js
+cd ~/bezgomin/deploy && docker compose exec game node dist/backup.js
 ```
 
 Копии лежат в `~/bezgomin/deploy/data/backups/`. Кроме того, сервер сам сохраняет копию при каждом запуске (хранятся последние 10).

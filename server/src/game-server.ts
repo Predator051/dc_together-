@@ -238,6 +238,9 @@ export class GameServer {
       case 'ping':
         c.send({ t: 'pong' });
         return;
+      case 'sync':
+        if (c.pid) this.sendView(c);
+        return;
       case 'hello': {
         if (this.limited(c.ip)) return this.err(c, 'rate_limited');
         const pid = typeof msg.token === 'string' ? this.opts.storage.sessionPlayer(msg.token, this.clock()) : null;

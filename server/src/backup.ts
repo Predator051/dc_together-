@@ -1,4 +1,4 @@
-// Manual backup: node --experimental-sqlite dist/backup.js [target-file]
+// Manual backup: node dist/backup.js [target-file]  (Node 24; older Node needs --experimental-sqlite)
 import { join, resolve } from 'node:path';
 import { Storage } from './storage.js';
 

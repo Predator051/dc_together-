@@ -12,7 +12,7 @@ function Bar({ value, max, kind }: { value: number; max: number; kind: string })
   );
 }
 
-export function Scene({ v, sc }: { v: PlayerView; sc: SceneView }) {
+export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked: boolean }) {
   const [min, setMin] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const blocksCount = sc.blocks.length;
@@ -39,7 +39,7 @@ export function Scene({ v, sc }: { v: PlayerView; sc: SceneView }) {
   }
 
   const options = sc.options ?? [];
-  const canAct = !sc.paused && !sc.waiting;
+  const canAct = !sc.paused && !sc.waiting && !locked;
 
   return (
     <div class="scene-wrap">
@@ -114,7 +114,7 @@ export function Scene({ v, sc }: { v: PlayerView; sc: SceneView }) {
           {sc.paused && <p class="muted">{sc.pausedText}</p>}
           {!sc.paused && sc.waiting && <p class="muted waiting">{sc.waitingText ?? T.waiting}</p>}
           {!sc.paused && sc.kind === 'text' && !sc.waiting && (
-            <button class="btn primary wide" onClick={() => net.send({ c: 'next' })}>
+            <button class="btn primary wide" disabled={locked} onClick={() => net.send({ c: 'next' })}>
               {sc.button ?? T.next}
             </button>
           )}

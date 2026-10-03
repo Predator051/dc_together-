@@ -31,12 +31,29 @@ export interface NetState {
   lobby: { slots: LobbySlot[]; freeRoles: Role[] } | null;
   error: string | null;
   toast: { text: string; id: number } | null;
+  /** The view may be outdated (tab was hidden, connection dropped): buttons stay disabled. */
+  stale: boolean;
+  /** A command is on its way to the server: buttons stay disabled until it answers. */
+  pending: boolean;
 }
 
 type Listener = (s: NetState) => void;
 
 export class Net {
-  state: NetState = { phase: 'connecting', connected: false, view: null, offset: 0, lobby: null, error: null, toast: null };
+  state: NetState = {
+    phase: 'connecting',
+    connected: false,
+    view: null,
+    offset: 0,
+    lobby: null,
+    error: null,
+    toast: null,
+    stale: true,
+    pending: false,
+  };
+  /** Clock samples (server time − local receive time). Each one is ≤ the true offset. */
+  private samples: Array<{ offset: number; at: number }> = [];
+  private pendingTimer: number | undefined;
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
   private token: string | null = readToken();
@@ -49,7 +66,14 @@ export class Net {
   constructor() {
     if (!this.token) this.state.phase = 'auth';
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && !this.state.connected) this.connect();
+      if (document.visibilityState !== 'visible') return;
+      if (!this.state.connected) {
+        this.connect();
+        return;
+      }
+      // Never trust what was on screen while hidden: ask for the current state first.
+      this.set({ stale: true });
+      this.raw({ t: 'sync' });
     });
     window.addEventListener('online', () => this.connect());
   }
@@ -73,6 +97,7 @@ export class Net {
     this.ws = ws;
     ws.onopen = () => {
       this.backoff = 500;
+      this.samples = [];
       this.set({ connected: true });
       const tok = this.token ?? this.memToken;
       if (tok) this.raw({ t: 'hello', token: tok });
@@ -90,7 +115,7 @@ export class Net {
     };
     ws.onclose = () => {
       window.clearInterval(this.pingTimer);
-      this.set({ connected: false });
+      this.set({ connected: false, stale: true, pending: false });
       this.ws = null;
       this.reconnectTimer = window.setTimeout(() => this.connect(), this.backoff);
       this.backoff = Math.min(this.backoff * 2, 5000);
@@ -107,7 +132,7 @@ export class Net {
         this.set({ phase: 'game', error: null, lobby: null });
         return;
       case 'view':
-        this.set({ view: msg.v, offset: msg.v.now - Date.now(), phase: 'game' });
+        this.set({ view: msg.v, offset: this.clockOffset(msg.v.now), phase: 'game', stale: false });
         return;
       case 'lobby':
         this.set({ lobby: { slots: msg.slots, freeRoles: msg.freeRoles }, error: null });
@@ -123,7 +148,8 @@ export class Net {
         this.set({ error: msg.text });
         return;
       case 'ack':
-        if (!msg.ok && msg.text) this.set({ toast: { text: msg.text, id: Date.now() } });
+        window.clearTimeout(this.pendingTimer);
+        this.set({ pending: false, ...(!msg.ok && msg.text ? { toast: { text: msg.text, id: Date.now() } } : {}) });
         return;
       default:
         return;
@@ -134,7 +160,22 @@ export class Net {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
+  /**
+   * Server time estimate that is never ahead of the real one: a message built at server time T
+   * arrives after some delay, so T − arrival ≤ true offset. The largest recent sample is the best.
+   */
+  private clockOffset(serverNow: number): number {
+    const at = Date.now();
+    this.samples.push({ offset: serverNow - at, at });
+    this.samples = this.samples.filter((x) => at - x.at < 120_000).slice(-50);
+    return Math.max(...this.samples.map((x) => x.offset));
+  }
+
   send(cmd: Command): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.state.pending) return;
+    this.set({ pending: true });
+    window.clearTimeout(this.pendingTimer);
+    this.pendingTimer = window.setTimeout(() => this.set({ pending: false }), 5000);
     this.raw({ t: 'cmd', cmd, seq: ++this.seq });
   }
 
