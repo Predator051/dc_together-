@@ -1,0 +1,6 @@
+# SITE_ADDRESS=":80"            -> plain HTTP by IP
+# SITE_ADDRESS="game.example.com" -> automatic HTTPS (Let's Encrypt)
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy game:8080
+}

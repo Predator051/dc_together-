@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.DS_Store
+
+# Local development artifacts
+*.log
+coverage/
+
+# Optional local secret exports
+.secret-build/
+
+# Deploy data (world database, backups) and local settings
+deploy/data/
+deploy/.env
+data/

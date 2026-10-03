@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--experimental-sqlite",
+        "dist/index.js"
+      ],
+      "port": 8787,
+      "env": {
+        "DATA_DIR": "data",
+        "INVITE_CODE": "TEST-1234",
+        "CLIENT_DIR": "client/dist"
+      },
+      "autoPort": true
+    }
+  ]
+}

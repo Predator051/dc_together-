@@ -1,0 +1,34 @@
+{
+  "name": "bezgomin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Co-op story game for two players",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "preact": "^11.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  },
+  "scripts": {
+    "dev:server": "NODE_OPTIONS=--experimental-sqlite tsx watch server/src/index.ts",
+    "dev:client": "vite --config client/vite.config.ts",
+    "build:client": "vite build --config client/vite.config.ts",
+    "build:server": "esbuild server/src/index.ts server/src/backup.ts --bundle --platform=node --target=node22 --format=esm --packages=external --outdir=dist --log-level=warning",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node --experimental-sqlite dist/index.js",
+    "typecheck": "tsc -p .",
+    "test": "NODE_OPTIONS=--experimental-sqlite vitest run",
+    "validate": "NODE_OPTIONS=--experimental-sqlite tsx scripts/validate.ts"
+  }
+}

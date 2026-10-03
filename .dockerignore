@@ -1,0 +1,12 @@
+node_modules
+dist
+client/dist
+deploy/data
+deploy/.env
+.git
+.claude
+content/secret
+tests
+coverage
+*.log
+.DS_Store
