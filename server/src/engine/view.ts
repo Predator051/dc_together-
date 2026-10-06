@@ -92,7 +92,9 @@ function paras(g: Game, p: Parameters<typeof resolveParas>[0], pid: PlayerId): s
 function groups(g: Game, pid: PlayerId): GroupView[] {
   const out: GroupView[] = [];
   const locs = [...g.ix.c.locations].sort((a, b) => a.order - b.order);
+  const here = g.p(pid).at;
   for (const loc of locs) {
+    if ((loc.area ?? g.ix.homeArea) !== here) continue;
     if (!g.test(loc.visible, pid)) continue;
     const entries: EntryView[] = [];
     for (const sc of g.ix.c.scenes) {
@@ -141,7 +143,7 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
         cost: costView(g, a.cost),
         gain: actionGains(g, a, pid),
         readyAt: cd > g.now ? cd : undefined,
-        cooldown: Math.round(a.cooldown * g.cooldownMult()),
+        cooldown: Math.round(a.cooldown * g.cooldownMult(g.ix.areaOf(a.group))),
       });
     }
     out.push({ id: loc.id, name: loc.name, desc: g.render(loc.desc, pid), base: !!loc.base, entries });
@@ -282,13 +284,14 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
     });
 
   const stoveState = g.stoveState();
-  const stoveText = stoveState === 'never' ? '' : ui(`stove_${stoveState}`);
+  // The stove is in Ясенець: elsewhere its state is not shown.
+  const stoveText = stoveState === 'never' || me.at !== g.ix.homeArea ? '' : ui(`stove_${stoveState}`);
 
   let partnerBusy: { text: string; from: number; until: number } | null = null;
   if (o.busy && o.busy.until > g.now) {
     const a = g.ix.actions.get(o.busy.action);
     if (a?.busy) {
-      const dur = Math.round(a.cooldown * g.cooldownMult());
+      const dur = Math.round(a.cooldown * g.cooldownMult(g.ix.areaOf(a.group)));
       const text = g.render(a.busy, pid, other);
       partnerBusy = { text: text.charAt(0).toLowerCase() + text.slice(1), from: o.busy.until - dur, until: o.busy.until };
     }
@@ -339,7 +342,7 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
   log.reverse();
 
   const goalDef = g.s.goal ? g.ix.goals.get(g.s.goal) : undefined;
-  const actDone = g.s.meta.actDone > 0 && g.ix.c.actEnd[g.s.meta.actDone]
+  const actDone = g.s.meta.actDone > 0 && g.s.meta.actDone >= g.s.meta.act && g.ix.c.actEnd[g.s.meta.actDone]
     ? { act: g.s.meta.actDone, text: g.render(g.ix.c.actEnd[g.s.meta.actDone], pid) }
     : null;
 
@@ -347,6 +350,8 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
     now: g.now,
     me: {
       pid,
+      area: me.at,
+      where: g.ix.areaWhere(me.at),
       name: me.name,
       gender: me.gender,
       role: me.role!,
@@ -362,6 +367,8 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
       role: o.role,
       roleTitle: o.joined ? g.roleTitle(other) : '',
       online: o.joined && o.online,
+      area: o.at,
+      where: g.ix.areaWhere(o.at),
       busy: partnerBusy,
       hp: o.hp,
       hpMax: o.hpMax,
@@ -379,7 +386,11 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
     journal: { clues, questions, people },
     actDone,
     busyUntil: me.busy && me.busy.until > g.now ? me.busy.until : 0,
-    busyFrom: me.busy && me.busy.until > g.now ? me.busy.until - Math.round((g.ix.actions.get(me.busy.action)?.cooldown ?? 0) * g.cooldownMult()) : 0,
+    busyFrom:
+      me.busy && me.busy.until > g.now
+        ? me.busy.until -
+          Math.round((g.ix.actions.get(me.busy.action)?.cooldown ?? 0) * g.cooldownMult(g.ix.areaOf(g.ix.actions.get(me.busy.action)?.group)))
+        : 0,
     busyAction: me.busy && me.busy.until > g.now ? me.busy.action : null,
   };
 }

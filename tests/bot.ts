@@ -87,6 +87,14 @@ export class Bot {
     }
 
     if (v.busyUntil > now) return null;
+    // Travel: stay with the partner; otherwise sometimes go where there may be work.
+    const travel = entries.find((e) => e.kind === 'act' && e.enabled && (e.id === 'act_40' || e.id === 'act_41'));
+    if (travel && !(travel.readyAt && travel.readyAt > now)) {
+      const apart = v.partner.joined && v.partner.area !== v.me.area;
+      const storyHere = entries.some((e) => e.kind === 'scene' && (e.enabled || e.reason === undefined || (e.cost?.some((c) => !c.ok) ?? false)));
+      if (apart && this.rng.chance(storyHere ? 0.15 : 0.6)) return { c: 'act', id: travel.id };
+      if (!apart && this.rng.chance(0.015)) return { c: 'act', id: travel.id };
+    }
     const wanted = this.wanted(v, entries);
     const ready = entries.filter((e) => e.kind === 'act' && e.enabled && !(e.readyAt && e.readyAt > now));
     const supper = entries.find((e) => e.kind === 'pool' && e.enabled);
@@ -103,9 +111,12 @@ export class Bot {
     }
 
     if (supper && v.partner.online) {
-      const foodOk = (v.res.find((r) => r.name === 'Харчі')?.n ?? 0) >= 2;
-      const chance = storyWaiting ? 0.03 : 0.25;
-      if (foodOk && (bestScore < 20 || this.rng.chance(chance))) return { c: 'act', id: supper.id };
+      // Don't eat the food that a waiting story step needs.
+      const food = v.res.find((r) => r.id === 'res_03')?.n ?? 0;
+      const reserve = Math.max(0, ...entries.flatMap((e) => (e.kind !== 'pool' ? (e.cost ?? []) : [])).filter((c) => c.id === 'res_03').map((c) => c.n));
+      const spare = food - 2 >= reserve;
+      const chance = storyWaiting ? 0.05 : 0.25;
+      if (spare && (bestScore < 20 || this.rng.chance(chance))) return { c: 'act', id: supper.id };
     }
     if (best) return { c: 'act', id: best.id };
     return null;
@@ -139,6 +150,8 @@ export class Bot {
     if (!a) return 0;
     let s = 1 + this.rng.next();
     if (a.once || a.oncePerPlayer) s += 100;
+    // Unknown outcome ("+?") with one-time vignettes is worth exploring.
+    if (a.beats?.length && e.gain?.some((x) => x.text === '+?')) s += 45;
     const gives = new Map<string, number>();
     for (const [r, y] of Object.entries(a.yield ?? {})) gives.set(r, (gives.get(r) ?? 0) + (Array.isArray(y) ? y[1] : y));
     for (const ch of a.chance ?? []) for (const [r, n] of Object.entries(ch.add ?? {})) if (n > 0) gives.set(r, (gives.get(r) ?? 0) + n * ch.p);
@@ -150,6 +163,7 @@ export class Bot {
       if (need && have - n < need) s -= 15;
     }
     if (a.id === 'act_02' && v.stove.state === 'warm') s -= 50;
+    if (a.id === 'act_40' || a.id === 'act_41') return 0;
     if (a.id === 'act_p5') s -= 40;
     if (a.id === 'act_09') s -= 5;
     return s;

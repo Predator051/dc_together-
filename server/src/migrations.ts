@@ -13,7 +13,12 @@ import { normalizeWorld } from './engine/index.js';
 export type Migration = (s: any) => any;
 
 export const migrations: Record<number, Migration> = {
-  // 1: (s) => { ...; s.version = 2; return s; },
+  // v1 -> v2 (act 2): players get a location; everyone was in Ясенець.
+  1: (s) => {
+    for (const pid of ['p1', 'p2']) if (s.players?.[pid] && !s.players[pid].at) s.players[pid].at = 'yas';
+    s.version = 2;
+    return s;
+  },
 };
 
 export class MigrationError extends Error {}

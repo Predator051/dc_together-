@@ -273,6 +273,13 @@ p {
   color: var(--ember2);
   flex: 1;
 }
+.where {
+  font-family: var(--sans);
+  color: var(--muted);
+}
+.where-other {
+  color: var(--ember);
+}
 .net {
   width: 10px;
   height: 10px;

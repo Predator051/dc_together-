@@ -86,7 +86,7 @@ export function autoplay(
     p1: new Bot('A', content, a),
     p2: new Bot('B', content, b),
   };
-  const until = opts.until ?? ((x: World) => !!x.state.flags['a1_done'] && !x.state.scene);
+  const until = opts.until ?? ((x: World) => !!x.state.flags['a2_done'] && !x.state.scene);
   const maxSteps = opts.maxSteps ?? 20000;
   const stallLimit = opts.stallLimit ?? 4000;
   const start = w.now;

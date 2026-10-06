@@ -182,6 +182,7 @@ function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: numbe
       <span class="dot" />
       <b>{p.name}</b>
       <span class="muted">{p.roleTitle ? ` · ${p.roleTitle}` : ''}</span>
+      {p.area !== v.me.area && <span class="where-other">{p.where}</span>}
       <span class="status">{status}</span>
       {working && (
         <span class="mini-bar" aria-hidden="true">
@@ -301,6 +302,7 @@ export function Game({ s }: { s: NetState }) {
       <header class="top">
         <div class="top-row">
           <span class="brand">{T.title}</span>
+          <span class="where small">{v.me.where}</span>
           {v.me.role && <span class="muted small">{v.day > 0 ? `${T.day} ${v.day}` : ''}</span>}
           <span class={`net ${s.connected ? 'ok' : 'bad'}`} title={s.connected ? T.onlineDot : T.offlineDot} />
         </div>

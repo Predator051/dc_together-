@@ -270,3 +270,52 @@ describe('buttons say what they give and cost', () => {
     expect(w.view('p2').busyUntil - w.view('p2').busyFrom).toBe(6000);
   });
 });
+
+describe('act 2 branches', () => {
+  it('if the wolves were killed in act 1, the den holds mute cubs that can be fed', () => {
+    const w = ready();
+    w.state.flags['enc_01:killed'] = 1;
+    w.state.players.p1.at = 'tower';
+    w.state.players.p2.at = 'tower';
+    w.state.res['res_03'] = 5;
+    w.g().startScene('scn_48');
+    w.cmd('p1', { c: 'next' });
+    w.cmd('p2', { c: 'next' });
+    expect(w.state.scene?.node).toBe('k1');
+    w.cmd('p1', { c: 'choose', id: 'feed' });
+    w.cmd('p2', { c: 'choose', id: 'feed' });
+    expect(w.state.flags['a2_cubs_fed']).toBe(1);
+    expect(w.state.res['res_03']).toBe(2);
+  });
+
+  it('players in different places cannot start a together scene; travel moves only the traveller', () => {
+    const w = ready();
+    w.state.flags['a1_done'] = 1;
+    w.state.flags['done:scn_40'] = 1;
+    w.state.flags['done:scn_41'] = 1;
+    w.state.players.p1.at = 'tower';
+    w.state.players.p2.at = 'tower';
+    expect(w.cmd('p2', { c: 'act', id: 'act_41' }).ok).toBe(true);
+    expect(w.state.players.p2.at).toBe('yas');
+    expect(w.state.players.p1.at).toBe('tower');
+    const scene = w.view('p1').groups.flatMap((g) => g.entries).find((e) => e.id === 'scn_55')!;
+    expect(scene.enabled).toBe(false);
+    expect(scene.reason).toBe('Оксана зараз у Ясенці.');
+    expect(w.view('p1').partner.where).toBe('у Ясенці');
+    // Groups of the other place are not shown.
+    expect(w.view('p2').groups.some((g) => g.id === 'loc_20')).toBe(false);
+    expect(w.view('p1').groups.some((g) => g.id === 'loc_02')).toBe(false);
+  });
+
+  it('the stove only burns and slows work while someone is home', () => {
+    const w = ready();
+    w.state.stove = { lit: true, fuel: 5000 };
+    w.state.players.p1.at = 'tower';
+    w.state.players.p2.at = 'tower';
+    w.advance(60_000);
+    expect(w.state.stove.fuel).toBe(5000);
+    w.state.stove.fuel = 0;
+    expect(w.g().cooldownMult('tower')).toBe(1);
+    expect(w.g().cooldownMult('yas')).toBe(1.5);
+  });
+});

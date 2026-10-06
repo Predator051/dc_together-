@@ -40,6 +40,23 @@ describe('world state migrations', () => {
     expect(() => migrateState(t, content, 0, {}, 1)).toThrow(MigrationError);
   });
 
+  it('real migration v1 -> v2: an act 1 world gets player locations and keeps everything else', () => {
+    const s = newWorld(content, 1, 0) as unknown as Record<string, any>;
+    s.version = 1;
+    for (const pid of ['p1', 'p2']) delete s.players[pid].at;
+    s.flags = { a1_done: 1, 'done:scn_14': 1 };
+    s.res = { ...s.res, res_01: 7 };
+    const { state, from, migrated } = migrateState(JSON.parse(JSON.stringify(s)), content, 0);
+    expect(from).toBe(1);
+    expect(migrated).toBe(true);
+    expect(state.version).toBe(2);
+    expect(state.players.p1.at).toBe('yas');
+    expect(state.players.p2.at).toBe('yas');
+    expect(state.flags['a1_done']).toBe(1);
+    expect(state.res['res_01']).toBe(7);
+    expect(state.res['res_22']).toBe(0);
+  });
+
   it('drops an in-progress scene that no longer exists, keeping the world playable', () => {
     const s = newWorld(content, 1, 0);
     s.scene = { id: 'scn_removed', node: 'n1', paused: false, ready: {}, picks: {}, used: {}, trail: [], combat: null, startedAt: 0 };

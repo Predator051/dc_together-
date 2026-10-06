@@ -1,6 +1,6 @@
 import type { Gender, PlayerId, Role, LogKind } from './content.js';
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 
 export interface PlayerState {
   id: PlayerId;
@@ -8,6 +8,8 @@ export interface PlayerState {
   name: string;
   gender: Gender;
   role: Role | null;
+  /** Area id where the player is (added in state version 2). */
+  at: string;
   hp: number;
   hpMax: number;
   flags: Record<string, number>;

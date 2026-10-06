@@ -117,6 +117,9 @@ export function validateContent(c: Content): Report {
   const npcs = new Set(c.npcs.map((x) => x.id));
   const encs = new Map(c.encounters.map((e) => [e.id, e]));
   const pools = new Set(c.pools.map((p) => p.pool));
+  const areas = new Set(c.areas.map((a) => a.id));
+  if (areas.size === 0) err('content: at least one area is required');
+  for (const l of c.locations) if (l.area && !areas.has(l.area)) err(`location ${l.id}: unknown area ${l.area}`);
 
   const maxCap = (id: string): number => {
     const r = c.resources.find((x) => x.id === id);
@@ -170,6 +173,7 @@ export function validateContent(c: Content): Report {
       if ('res' in x && !res.has(x.res)) err(`${where}: unknown resource ${x.res}`);
       if (('clue' in x && !clues.has(x.clue)) || ('anyClue' in x && !clues.has(x.anyClue))) err(`${where}: unknown clue`);
       if ('rel' in x && !npcs.has(x.rel)) err(`${where}: unknown npc ${x.rel}`);
+      if (('at' in x && !areas.has(x.at)) || ('partnerAt' in x && !areas.has(x.partnerAt))) err(`${where}: unknown area`);
     }
   };
   const checkEffects = (where: string, effs: Effect[], inScene: boolean) => {
@@ -179,6 +183,7 @@ export function validateContent(c: Content): Report {
       if ('take' in e) checkRes(where, e.take);
       if ('clue' in e && !clues.has(e.clue)) err(`${where}: unknown clue ${e.clue}`);
       if ('mystery' in e && !mysteries.has(e.mystery)) err(`${where}: unknown mystery ${e.mystery}`);
+      if ('moveTo' in e && !areas.has(e.moveTo)) err(`${where}: unknown area ${e.moveTo}`);
       if (('rel' in e && !npcs.has(e.rel)) || ('meet' in e && !npcs.has(e.meet))) err(`${where}: unknown npc`);
       if ('scene' in e) {
         if (!scenes.has(e.scene)) err(`${where}: unknown scene ${e.scene}`);

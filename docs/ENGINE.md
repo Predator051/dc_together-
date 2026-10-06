@@ -19,6 +19,10 @@ npm run typecheck
 
 ## Сущности контента
 
+- **AreaDef** — область (место, где находится игрок): `id`, `name`, `where` («у Ясенці»).
+  У игрока `at`; карточки мест (`LocationDef.area`) видны только в своей области; совместная
+  сцена требует обоих игроков в области её группы. Переход — эффект `moveTo`.
+
 - **ResourceDef** — ресурс/предмет. `cap` + `capBonus`, `hidden` для внутренних запасов,
   `kind: 'tool'` — показывается в «Речі».
 - **LocationDef** — карточка места (группа кнопок). `visible` — когда появляется.
@@ -53,7 +57,8 @@ npm run typecheck
 
 Эффекты: `set`, `unset`, `inc`, `pset` (`who: actor|both|hunter|maker`), `add`, `take`, `clue`,
 `log`, `mystery` (поднять уровень), `rel`, `meet`, `scene` (только из сцен — цепочка),
-`advanceDay`, `heal`, `stove`, `actDone`, `if/then/else`.
+`advanceDay`, `heal`, `stove`, `actDone`, `startAct`, `moveTo` (`who`), `if/then/else`.
+Условия мест: `at`, `partnerAt`.
 
 ## Тексты
 

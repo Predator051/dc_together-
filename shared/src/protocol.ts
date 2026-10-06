@@ -87,6 +87,8 @@ export interface PartnerView {
   role: Role | null;
   roleTitle: string;
   online: boolean;
+  area: string;
+  where: string;
   busy: { text: string; from: number; until: number } | null;
   hp: number;
   hpMax: number;
@@ -94,6 +96,8 @@ export interface PartnerView {
 
 export interface MeView {
   pid: PlayerId;
+  area: string;
+  where: string;
   name: string;
   gender: Gender;
   role: Role;

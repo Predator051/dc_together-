@@ -22,6 +22,9 @@ export type Cond =
   | { partnerOnline: boolean }
   | { stove: 'warm' | 'cold' | 'never' }
   | { rel: string; gte?: number; lt?: number }
+  /** Viewer / partner is in this area. */
+  | { at: string }
+  | { partnerAt: string }
   | { all: Cond[] }
   | { any: Cond[] }
   | { not: Cond };
@@ -74,6 +77,9 @@ export type Effect =
   | { heal: number | 'full' }
   | { stove: number }
   | { actDone: number }
+  | { startAct: number }
+  /** Move players to another area (travel). */
+  | { moveTo: string; who?: EffectTarget }
   | { if: Cond; then: Effect[]; else?: Effect[] };
 
 export interface ResourceDef {
@@ -159,6 +165,15 @@ export interface LocationDef {
   visible: Cond;
   order: number;
   base?: boolean;
+  /** Area the location belongs to (default: the first area). Players see only their area. */
+  area?: string;
+}
+
+/** A place players can be in. `where` is the locative form for texts ("у Ясенці"). */
+export interface AreaDef {
+  id: string;
+  name: string;
+  where: string;
 }
 
 export interface OptionDef {
@@ -309,6 +324,7 @@ export interface StoveDef {
 }
 
 export interface Content {
+  areas: AreaDef[];
   resources: ResourceDef[];
   actions: ActionDef[];
   pools: PoolActionDef[];

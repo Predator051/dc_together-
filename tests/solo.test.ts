@@ -39,13 +39,13 @@ describe('solo play: one player offline', () => {
     expect(hatch?.enabled).toBe(false);
   });
 
-  for (const pid of ['p1', 'p2'] as const) {
-    it(`routine by ${pid} alone never advances the story`, () => {
+  for (const [pid, stage] of [['p1', 'done:scn_10'], ['p2', 'done:scn_10'], ['p1', 'done:scn_44'], ['p2', 'done:scn_44']] as const) {
+    it(`routine by ${pid} alone never advances the story (after ${stage})`, () => {
       // Play together until the middle of the act, then one player leaves.
       const r = autoplay(
         { choice: 'random', combat: 'smart', seed: 21 },
         { choice: 'random', combat: 'smart', seed: 22 },
-        { seed: 5, until: (x) => !!x.state.flags['done:scn_10'] },
+        { seed: 5, until: (x) => !!x.state.flags[stage] && !x.state.scene },
       );
       expect(r.done).toBe(true);
       const w = r.world;

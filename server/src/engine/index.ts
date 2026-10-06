@@ -75,6 +75,20 @@ export class ContentIndex {
   ui(key: string): string {
     return this.c.ui[key] ?? key;
   }
+
+  get homeArea(): string {
+    return this.c.areas[0]?.id ?? 'home';
+  }
+
+  /** Area of a location / group id. */
+  areaOf(group: string | undefined): string {
+    if (!group) return this.homeArea;
+    return this.locations.get(group)?.area ?? this.homeArea;
+  }
+
+  areaWhere(area: string): string {
+    return this.c.areas.find((a) => a.id === area)?.where ?? area;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +208,8 @@ export class Game {
       return (o.joined && o.online) === c.partnerOnline;
     }
     if ('stove' in c) return this.stoveState() === c.stove || (c.stove === 'warm' && this.stoveState() === 'low');
+    if ('at' in c) return pid ? this.p(pid).at === c.at : false;
+    if ('partnerAt' in c) return pid ? this.p(this.other(pid)).at === c.partnerAt : false;
     if ('rel' in c) {
       const v = this.s.npcs[c.rel]?.rel ?? 0;
       if (c.gte !== undefined && v < c.gte) return false;
@@ -302,8 +318,9 @@ export class Game {
     return 'warm';
   }
 
-  cooldownMult(): number {
-    return this.stoveState() === 'cold' ? this.ix.c.stove.coldPenalty : 1;
+  /** Cold stove slows work, but only at home where the stove is. */
+  cooldownMult(area: string = this.ix.homeArea): number {
+    return area === this.ix.homeArea && this.stoveState() === 'cold' ? this.ix.c.stove.coldPenalty : 1;
   }
 
   // ----- effects -------------------------------------------------------------
@@ -404,6 +421,15 @@ export class Game {
       this.s.meta.actDone = Math.max(this.s.meta.actDone, e.actDone);
       return;
     }
+    if ('startAct' in e) {
+      this.s.meta.act = Math.max(this.s.meta.act, e.startAct);
+      return;
+    }
+    if ('moveTo' in e) {
+      for (const pid of this.targets(e.who ?? 'actor', actor)) this.p(pid).at = e.moveTo;
+      this.s.proposal = null;
+      return;
+    }
   }
 
   grantClue(id: string): void {
@@ -429,6 +455,7 @@ export class Game {
   // ----- routine actions -----------------------------------------------------
 
   actionVisible(a: ActionDef, pid: PlayerId): boolean {
+    if (this.ix.areaOf(a.group) !== this.p(pid).at) return false;
     if (a.role && this.p(pid).role !== a.role) return false;
     if (a.once && this.flag(`built:${a.id}`)) return false;
     if (a.oncePerPlayer && this.p(pid).flags[`built:${a.id}`]) return false;
@@ -496,7 +523,7 @@ export class Game {
 
     if (a.once) this.s.flags[`built:${a.id}`] = 1;
     if (a.oncePerPlayer) p.flags[`built:${a.id}`] = 1;
-    const cd = Math.round(a.cooldown * this.cooldownMult());
+    const cd = Math.round(a.cooldown * this.cooldownMult(this.ix.areaOf(a.group)));
     if (a.recharge) p.cooldowns[a.id] = this.now + a.recharge;
     p.busy = { action: a.id, until: this.now + cd };
     return OK;
@@ -520,6 +547,7 @@ export class Game {
   // ----- proposals & scenes --------------------------------------------------
 
   sceneOrPoolVisible(def: SceneDef | PoolActionDef, pid: PlayerId): boolean {
+    if (def.group && this.ix.areaOf(def.group) !== this.p(pid).at) return false;
     if ('start' in def) {
       if (def.once !== false && this.flag(`done:${def.id}`)) return false;
     } else if (!this.pickFromPool(def.pool, true)) {
@@ -532,6 +560,8 @@ export class Game {
   proposalBlock(def: SceneDef | PoolActionDef, pid: PlayerId): string | null {
     const o = this.p(this.other(pid));
     if (!o.joined || !o.online) return this.ix.ui('err_need_both');
+    const area = this.ix.areaOf(def.group);
+    if (o.at !== area) return `${this.render(this.ix.ui('partner_now'), pid)} ${this.ix.areaWhere(o.at)}.`;
     if (this.s.scene) return this.s.scene.paused ? this.ix.ui('err_scene_paused') : this.ix.ui('err_in_scene');
     if (this.s.proposal) return this.ix.ui('err_proposal_pending');
     if (def.enabled && !this.test(def.enabled, pid)) return def.disabledHint ? this.render(def.disabledHint, pid) : this.ix.ui('err_not_now');
@@ -576,6 +606,11 @@ export class Game {
     if (!pr || pr.by === pid) return this.fail('err_not_now');
     if (!this.bothOnline()) return this.fail('err_need_both');
     const via = this.ix.entry(pr.via);
+    const area = this.ix.areaOf(via && via.kind !== 'act' ? via.def.group : undefined);
+    if (this.p(pid).at !== area || this.p(pr.by).at !== area) {
+      this.s.proposal = null;
+      return this.fail('err_not_now');
+    }
     const cost = via && via.kind !== 'act' ? via.def.cost : undefined;
     if (!this.hasCost(cost)) {
       this.s.proposal = null;
@@ -885,8 +920,8 @@ export class Game {
     const st = this.s.stove;
     const dt = Math.max(0, this.now - this.s.meta.lastTick);
     this.s.meta.lastTick = this.now;
-    const anyoneOnline = PLAYER_IDS.some((pid) => this.p(pid).online);
-    if (!anyoneOnline || !st.lit || st.fuel <= 0) return false;
+    const anyoneHome = PLAYER_IDS.some((pid) => this.p(pid).online && this.p(pid).at === this.ix.homeArea);
+    if (!anyoneHome || !st.lit || st.fuel <= 0) return false;
     const before = this.stoveState();
     st.fuel = Math.max(0, st.fuel - dt);
     const after = this.stoveState();
@@ -921,13 +956,14 @@ export class Game {
 // World creation
 // ---------------------------------------------------------------------------
 
-function blankPlayer(id: PlayerId, hp: number, now: number): PlayerState {
+function blankPlayer(id: PlayerId, hp: number, now: number, at = 'yas'): PlayerState {
   return {
     id,
     joined: false,
     name: '',
     gender: 'm',
     role: null,
+    at,
     hp,
     hpMax: hp,
     flags: {},
@@ -947,7 +983,10 @@ export function newWorld(content: Content, seed: number, now: number): WorldStat
   return {
     version: STATE_VERSION,
     meta: { seed, rng: seed >>> 0, createdAt: now, lastTick: now, day: 1, act: 1, nextLogId: 1, actDone: 0 },
-    players: { p1: blankPlayer('p1', content.start.hp, now), p2: blankPlayer('p2', content.start.hp, now) },
+    players: {
+      p1: blankPlayer('p1', content.start.hp, now, content.areas[0]!.id),
+      p2: blankPlayer('p2', content.start.hp, now, content.areas[0]!.id),
+    },
     res,
     seenRes,
     flags: {},
@@ -965,9 +1004,11 @@ export function newWorld(content: Content, seed: number, now: number): WorldStat
 /** Ensure a loaded world has entries for content added after it was created. */
 export function normalizeWorld(content: Content, s: WorldState, now: number): WorldState {
   for (const r of content.resources) if (s.res[r.id] === undefined) s.res[r.id] = 0;
+  const areas = new Set(content.areas.map((a) => a.id));
   for (const pid of PLAYER_IDS) {
     s.players[pid].online = false;
     s.players[pid].busy = null;
+    if (!areas.has(s.players[pid].at)) s.players[pid].at = content.areas[0]!.id;
   }
   if (s.scene) s.scene.paused = true;
   s.proposal = null;
