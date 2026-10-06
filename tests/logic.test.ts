@@ -319,3 +319,15 @@ describe('act 2 branches', () => {
     expect(w.g().cooldownMult('yas')).toBe(1.5);
   });
 });
+
+describe('end-of-act banner', () => {
+  it('is hidden once the next act exists, even before it starts', () => {
+    const w = ready();
+    w.state.meta.actDone = 1;
+    w.state.flags['a1_done'] = 1;
+    expect(w.view('p1').actDone).toBeNull();
+    expect(w.view('p1').goal).toContain('вирушити на схід');
+    w.state.meta.actDone = 2;
+    expect(w.view('p1').actDone?.act).toBe(2);
+  });
+});

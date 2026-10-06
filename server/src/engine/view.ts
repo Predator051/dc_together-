@@ -342,7 +342,9 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
   log.reverse();
 
   const goalDef = g.s.goal ? g.ix.goals.get(g.s.goal) : undefined;
-  const actDone = g.s.meta.actDone > 0 && g.s.meta.actDone >= g.s.meta.act && g.ix.c.actEnd[g.s.meta.actDone]
+  // The "end of act" banner only makes sense while no later act exists in this build.
+  const lastAct = Math.max(0, ...Object.keys(g.ix.c.actEnd).map(Number));
+  const actDone = g.s.meta.actDone > 0 && g.s.meta.actDone >= lastAct && g.ix.c.actEnd[g.s.meta.actDone]
     ? { act: g.s.meta.actDone, text: g.render(g.ix.c.actEnd[g.s.meta.actDone], pid) }
     : null;
 
