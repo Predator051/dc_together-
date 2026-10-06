@@ -6,6 +6,7 @@ import type {
   GainView,
   GroupView,
   LogView,
+  MateEntryView,
   OptionView,
   PlayerView,
   SceneBlock,
@@ -146,7 +147,43 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
         cooldown: Math.round(a.cooldown * g.cooldownMult(g.ix.areaOf(a.group))),
       });
     }
-    out.push({ id: loc.id, name: loc.name, desc: g.render(loc.desc, pid), base: !!loc.base, entries });
+    const partner = mateEntries(g, pid, loc.id);
+    out.push({ id: loc.id, name: loc.name, desc: g.render(loc.desc, pid), base: !!loc.base, entries, ...(partner.length ? { partner } : {}) });
+  }
+  return out;
+}
+
+/**
+ * Actions here that only the partner's role can do: shown read-only, wherever the partner is,
+ * so a player knows what the other one could make of the shared stores.
+ */
+function mateEntries(g: Game, pid: PlayerId, locId: string): MateEntryView[] {
+  const other = g.other(pid);
+  const o = g.p(other);
+  const me = g.p(pid);
+  if (!o.joined || !o.role || o.role === me.role) return [];
+  const out: MateEntryView[] = [];
+  for (const a of g.ix.c.actions) {
+    if (a.group !== locId || a.role !== o.role) continue;
+    // visible to the partner, as if they stood here
+    if (a.once && g.flag(`built:${a.id}`)) continue;
+    if (a.oncePerPlayer && o.flags[`built:${a.id}`]) continue;
+    if (a.visible && !g.test(a.visible, other)) continue;
+    const away = o.at !== g.ix.areaOf(a.group);
+    const block = away || !o.online ? null : g.actionBlock(a, other);
+    const reason = !o.online
+      ? g.render(g.ix.ui('mate_offline'), pid)
+      : away
+        ? g.render(g.ix.ui('mate_away'), pid)
+        : shownReason(g, block);
+    out.push({
+      id: a.id,
+      label: g.render(a.label, other),
+      ready: o.online && !away && block === null,
+      ...(reason ? { reason } : {}),
+      cost: costView(g, a.cost),
+      gain: actionGains(g, a, other),
+    });
   }
   return out;
 }

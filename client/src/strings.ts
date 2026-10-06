@@ -90,6 +90,8 @@ export const T = {
   deltaBoth: 'Разом',
   soundOn: 'Увімкнути звук',
   soundOff: 'Вимкнути звук',
+  mateCan: 'може тут',
+  mateNow: 'зараз',
 };
 
 export type Strings = typeof T;

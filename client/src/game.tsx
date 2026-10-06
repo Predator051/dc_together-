@@ -1,13 +1,13 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { EntryView, GroupView, PlayerView } from '../../shared/src/protocol.js';
+import type { EntryView, GroupView, MateEntryView, PlayerView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
 import { Ambient } from './ambient.js';
 import { Notes, useSeenClues } from './notes.js';
 import { sound } from './sound.js';
 import { Scene } from './scene.js';
-import { IconFlame, IconLock, IconLog, IconMute, IconNotes, IconPair, IconPin, IconSnow, IconSound, IconWork } from './icons.js';
+import { IconDown, IconFlame, IconLock, IconLog, IconMute, IconNotes, IconPair, IconPin, IconSnow, IconSound, IconWork } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -171,6 +171,57 @@ function Entry({ e, c }: { e: EntryView; c: Ctx }) {
   );
 }
 
+/** What only the partner can do here: read-only, folded by default (the choice is remembered). */
+function MateList({ items, name }: { items: MateEntryView[]; name: string }) {
+  const [open, setOpen] = useState(() => load('bezgomin.mate') === 'open');
+  const toggle = () => {
+    store('bezgomin.mate', open ? 'closed' : 'open');
+    setOpen(!open);
+  };
+  const ready = items.filter((m) => m.ready).length;
+  // "not online" / "elsewhere" applies to everything: say it once, in the header
+  const common = items[0]?.reason && items.every((m) => m.reason === items[0]!.reason) ? items[0]!.reason : null;
+  return (
+    <div class={`mate-list ${open ? 'open' : ''}`}>
+      <button type="button" class="mate-list-head" aria-expanded={open} onClick={toggle}>
+        <span class="avatar small">{name.slice(0, 1).toUpperCase()}</span>
+        <span class="mate-list-title">
+          {name} {T.mateCan}
+          <span class="mate-list-count">
+            {items.length}
+            {ready > 0 && ready < items.length && ` · ${T.mateNow} ${ready}`}
+          </span>
+          {common && <span class="mate-list-note">{common}</span>}
+        </span>
+        <IconDown class="topic-chev" />
+      </button>
+      {open && (
+        <ul class="mate-items">
+          {items.map((m) => (
+            <li class={`mate-item ${m.ready ? 'ready' : ''}`}>
+              <span class="mate-item-label">{m.label}</span>
+              <span class="tile-meta">
+                {(m.gain ?? []).map((x) => (
+                  <span class={`m gain ${x.unsure ? 'unsure' : ''}`}>{x.text}</span>
+                ))}
+                {(m.cost ?? []).map((c) =>
+                  c.stock ? null : (
+                    <span class={`m cost ${c.ok ? '' : 'short'}`}>
+                      −{c.n} {c.name}
+                      {!c.ok && ` (${T.have} ${c.have})`}
+                    </span>
+                  ),
+                )}
+                {m.reason && !common && <span class="m reason">{m.reason}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Group({ g, c }: { g: GroupView; c: Ctx }) {
   return (
     <section class={`group ${g.base ? 'base' : ''}`}>
@@ -183,6 +234,7 @@ function Group({ g, c }: { g: GroupView; c: Ctx }) {
           <Entry key={e.id} e={e} c={c} />
         ))}
       </div>
+      {g.partner && g.partner.length > 0 && <MateList items={g.partner} name={c.v.partner.name} />}
     </section>
   );
 }

@@ -10,6 +10,8 @@ export const ui: Record<string, string> = {
   err_in_scene: 'Спершу доведіть до кінця спільну справу.',
   err_not_now: 'Зараз не вийде.',
   err_cost: 'Бракує припасів.',
+  mate_away: '{partner} зараз в іншому місці.',
+  mate_offline: '{partner} зараз не в мережі.',
   err_full: 'Більше нема куди складати.',
   err_cooldown: 'Ще не час.',
   err_busy: 'Спершу закінчи почате.',

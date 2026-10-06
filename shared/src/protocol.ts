@@ -85,6 +85,18 @@ export interface GroupView {
   desc: string;
   base: boolean;
   entries: EntryView[];
+  /** What only the partner's role can do here (read-only, so the two can plan together). */
+  partner?: MateEntryView[];
+}
+
+export interface MateEntryView {
+  id: string;
+  label: string;
+  /** The partner could do it right now. */
+  ready: boolean;
+  reason?: string;
+  cost?: CostView[];
+  gain?: GainView[];
 }
 
 export interface PartnerView {
