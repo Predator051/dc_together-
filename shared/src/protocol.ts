@@ -35,7 +35,15 @@ export type ServerMsg =
   | { t: 'view'; v: PlayerView; rev: number }
   | { t: 'err'; code: ErrCode; text: string }
   | { t: 'ack'; seq?: number; ok: boolean; text?: string; rev: number }
-  | { t: 'pong' };
+  | { t: 'pong' }
+  /** What changed in the shared stock after someone's command (shown as a popup to both). */
+  | { t: 'delta'; by: PlayerId; together: boolean; items: DeltaItem[] };
+
+export interface DeltaItem {
+  id: string;
+  name: string;
+  n: number;
+}
 
 export type ErrCode = 'bad_code' | 'bad_token' | 'slots_full' | 'role_taken' | 'bad_input' | 'rate_limited' | 'not_authed';
 

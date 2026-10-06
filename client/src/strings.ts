@@ -75,6 +75,7 @@ export const T = {
   actDone: 'Кінець дії',
   sec: 'с',
   have: 'є',
+  deltaBoth: 'Разом',
 };
 
 export type Strings = typeof T;

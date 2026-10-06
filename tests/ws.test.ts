@@ -302,3 +302,27 @@ describe('fresh state on request', () => {
     expect(m.v.me.name).toBe('Марко');
   });
 });
+
+describe('stock change popups', () => {
+  it('both players get a delta with what the actor gained and spent', async () => {
+    await boot();
+    const [a, b] = await pair();
+    await throughHatch(a, b);
+    await a.cmd({ c: 'act', id: 'scn_01' });
+    await b.cmd({ c: 'accept' });
+    for (let i = 0; i < 12; i++) {
+      await settle(a, b);
+      const sc = a.view!.scene;
+      if (!sc) break;
+      if (sc.kind === 'choice') await Promise.all([a.cmd({ c: 'choose', id: 'quiet' }), b.cmd({ c: 'choose', id: 'quiet' })]);
+      else await Promise.all([a.cmd({ c: 'next' }), b.cmd({ c: 'next' })]);
+    }
+    const da = a.wait('delta');
+    const db = b.wait('delta');
+    expect((await b.cmd({ c: 'act', id: 'act_10' })).ok).toBe(true);
+    const [ma, mb] = await Promise.all([da, db]);
+    expect(ma.by).toBe('p2');
+    expect(mb.items).toEqual([{ id: 'res_01', name: 'Дрова', n: 1 }]);
+    expect(ma.together).toBe(false);
+  });
+});

@@ -885,3 +885,101 @@ p {
     padding-top: 14px;
   }
 }
+
+/* ---------- stock change popups ---------- */
+.deltas {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: calc(100% - 24px);
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.deltas.lifted {
+  bottom: calc(120px + env(safe-area-inset-bottom));
+}
+.delta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 10px;
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(30, 25, 19, 0.96);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  font-family: var(--sans);
+  font-size: 1rem;
+  animation: delta-life 4.2s ease both;
+}
+.delta.from-me {
+  border-color: #5a4a2a;
+}
+.delta.from-partner {
+  border-color: #3e5560;
+}
+.delta.from-both {
+  border-color: #6a5236;
+}
+.delta .who {
+  color: var(--frost);
+  font-weight: 600;
+}
+.delta .item {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.delta .plus {
+  color: #b9d49a;
+}
+.delta .minus {
+  color: #d39a8a;
+  font-weight: 400;
+}
+@keyframes delta-life {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  8% {
+    opacity: 1;
+    transform: none;
+  }
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .delta {
+    animation: none;
+  }
+}
+@media (min-width: 960px) {
+  .deltas {
+    left: auto;
+    right: 24px;
+    transform: none;
+    bottom: 24px;
+    align-items: flex-end;
+    width: auto;
+  }
+  .deltas.lifted {
+    bottom: 24px;
+  }
+  .delta {
+    font-size: 1.05rem;
+  }
+}

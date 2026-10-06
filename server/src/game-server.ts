@@ -2,7 +2,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { Content, Gender, PlayerId, Role } from '../../shared/src/content.js';
 import { PLAYER_IDS } from '../../shared/src/content.js';
-import type { ClientMsg, Command, ErrCode, LobbySlot, ServerMsg } from '../../shared/src/protocol.js';
+import type { ClientMsg, Command, DeltaItem, ErrCode, LobbySlot, ServerMsg } from '../../shared/src/protocol.js';
 import { seedFrom } from '../../shared/src/rng.js';
 import type { WorldState } from '../../shared/src/state.js';
 import { STATE_VERSION } from '../../shared/src/state.js';
@@ -145,6 +145,20 @@ export class GameServer {
     }
   }
 
+  /** Tell everyone what this command added or spent (visible resources only). */
+  private sendDelta(by: PlayerId, before: Record<string, number>, together: boolean): void {
+    const items: DeltaItem[] = [];
+    for (const r of this.opts.content.resources) {
+      if (r.hidden) continue;
+      const n = (this.state.res[r.id] ?? 0) - (before[r.id] ?? 0);
+      if (n !== 0) items.push({ id: r.id, name: r.name, n });
+    }
+    if (!items.length) return;
+    items.sort((a, b) => b.n - a.n);
+    const msg: ServerMsg = { t: 'delta', by, together, items };
+    for (const conn of this.conns) if (conn.pid) conn.send(msg);
+  }
+
   private sendView(c: Conn): void {
     if (!c.pid) return;
     c.send({ t: 'view', v: buildView(this.game(), c.pid), rev: this.rev });
@@ -285,8 +299,13 @@ export class GameServer {
         if (!c.pid) return this.err(c, 'not_authed');
         const cmd = validCommand(msg.cmd);
         if (!cmd) return;
+        const before = { ...this.state.res };
+        const inScene = !!this.state.scene || cmd.c === 'accept';
         const r = this.game().command(c.pid, cmd);
-        if (r.ok) this.changed();
+        if (r.ok) {
+          this.changed();
+          this.sendDelta(c.pid, before, inScene || !!this.state.scene);
+        }
         c.send({ t: 'ack', seq: msg.seq, ok: r.ok, text: r.err, rev: this.rev });
         return;
       }

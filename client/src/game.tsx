@@ -397,6 +397,20 @@ export function Game({ s }: { s: NetState }) {
 
       {v.scene && <Scene v={v} sc={v.scene} locked={locked} />}
       {s.toast && <div class="toast">{s.toast.text}</div>}
+      {s.deltas.length > 0 && (
+        <div class={`deltas ${v.proposal && !v.scene ? 'lifted' : ''}`} aria-live="polite">
+          {s.deltas.map((d) => (
+            <div key={d.id} class={`delta from-${d.by}`}>
+              {d.by !== 'me' && <span class="who">{d.by === 'both' ? T.deltaBoth : v.partner.name}</span>}
+              {d.items.map((it) => (
+                <span class={`item ${it.n > 0 ? 'plus' : 'minus'}`}>
+                  {it.n > 0 ? `+${it.n}` : `−${-it.n}`} {it.name}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

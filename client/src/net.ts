@@ -1,4 +1,4 @@
-import type { ClientMsg, Command, LobbySlot, PlayerView, ServerMsg } from '../../shared/src/protocol.js';
+import type { ClientMsg, Command, DeltaItem, LobbySlot, PlayerView, ServerMsg } from '../../shared/src/protocol.js';
 import type { Role } from '../../shared/src/content.js';
 
 const TOKEN_KEY = 'bezgomin.token';
@@ -31,6 +31,8 @@ export interface NetState {
   lobby: { slots: LobbySlot[]; freeRoles: Role[] } | null;
   error: string | null;
   toast: { text: string; id: number } | null;
+  /** Recent stock changes (own and partner's), shown as popups. */
+  deltas: Array<{ id: number; by: 'me' | 'partner' | 'both'; items: DeltaItem[] }>;
   /** The view may be outdated (tab was hidden, connection dropped): buttons stay disabled. */
   stale: boolean;
   /** A command is on its way to the server: buttons stay disabled until it answers. */
@@ -48,12 +50,14 @@ export class Net {
     lobby: null,
     error: null,
     toast: null,
+    deltas: [],
     stale: true,
     pending: false,
   };
   /** Clock samples (server time − local receive time). Each one is ≤ the true offset. */
   private samples: Array<{ offset: number; at: number }> = [];
   private pendingTimer: number | undefined;
+  private deltaSeq = 0;
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
   private token: string | null = readToken();
@@ -147,6 +151,15 @@ export class Net {
         }
         this.set({ error: msg.text });
         return;
+      case 'delta': {
+        const me = this.state.view?.me.pid;
+        const by: 'me' | 'partner' | 'both' = msg.together ? 'both' : msg.by === me ? 'me' : 'partner';
+        const id = ++this.deltaSeq;
+        // Keep the newest few; each one disappears on its own.
+        this.set({ deltas: [...this.state.deltas, { id, by, items: msg.items }].slice(-5) });
+        window.setTimeout(() => this.set({ deltas: this.state.deltas.filter((d) => d.id !== id) }), 4200);
+        return;
+      }
       case 'ack':
         window.clearTimeout(this.pendingTimer);
         this.set({ pending: false, ...(!msg.ok && msg.text ? { toast: { text: msg.text, id: Date.now() } } : {}) });
