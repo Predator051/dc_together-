@@ -186,6 +186,8 @@ export interface ClueView {
   text: string;
   personal: boolean;
   at: number;
+  /** The question this clue belongs to (notes are grouped by it). */
+  mystery?: string;
 }
 
 export interface QuestionView {

@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { EntryView, GroupView, PlayerView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
+import { Notes, useSeenClues } from './notes.js';
 import { Scene } from './scene.js';
-import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconTarget, IconWork, IconEye } from './icons.js';
+import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconTarget, IconWork } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -50,6 +51,17 @@ function Fill({ from, until, offset, cls }: { from: number; until: number; offse
     return { p: Math.max(0, Math.min(1, (now - from) / span)), left: Math.max(0, until - now) };
   });
   return <span class={`anim-fill ${cls}`} style={{ '--p0': String(start.p), animationDuration: `${start.left}ms` }} />;
+}
+
+function useMedia(query: string): boolean {
+  const [hit, setHit] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setHit(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return hit;
 }
 
 function load(key: string): string | null {
@@ -251,65 +263,6 @@ function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: numbe
   );
 }
 
-function Notes({ v }: { v: PlayerView }) {
-  const j = v.journal;
-  if (!j.clues.length && !j.questions.length && !j.people.length) return <p class="empty">{T.emptyNotes}</p>;
-  return (
-    <div class="notes">
-      {j.questions.length > 0 && (
-        <section class="panel">
-          <h3>{T.questions}</h3>
-          <ul class="questions">
-            {j.questions.map((q) => (
-              <li class="question">
-                <span>{q.question}</span>
-                <span class={`level l${q.level}`}>{q.levelText}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {j.clues.length > 0 && (
-        <section class="panel">
-          <h3>{T.clues}</h3>
-          <div class="clues">
-            {j.clues.map((c) => (
-              <article class={`clue ${c.personal ? 'personal' : ''}`}>
-                <div class="clue-head">
-                  <b>{c.title}</b>
-                  {c.personal && (
-                    <span class="pill mine">
-                      <IconEye />
-                      {T.personalShort}
-                    </span>
-                  )}
-                </div>
-                <p>{c.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-      {j.people.length > 0 && (
-        <section class="panel">
-          <h3>{T.people}</h3>
-          <div class="people">
-            {j.people.map((p) => (
-              <div class="person">
-                <span class="avatar small">{p.name.slice(0, 1).toUpperCase()}</span>
-                <div>
-                  <b>{p.name}</b>
-                  <p>{p.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
 function Log({ v }: { v: PlayerView }) {
   const items = [...v.log].reverse();
   if (!items.length) return <p class="empty">{T.emptyLog}</p>;
@@ -334,13 +287,13 @@ export function Game({ s }: { s: NetState }) {
   // Pending clicks are swallowed in net.send (no visual flicker); a stale view locks visibly.
   const locked = s.stale || !s.connected;
   const ctx: Ctx = { v, now, offset: s.offset, locked };
-  const seenClues = Number(load('bezgomin.clues') ?? '0');
-  const newNotes = v.journal.clues.length > seenClues;
+  const [seen, markSeen] = useSeenClues(v.journal.clues.map((c) => c.id));
+  const newNotes = v.journal.clues.some((c) => !seen.has(c.id));
+  const desktop = useMedia('(min-width: 960px)');
+  const [side, setSide] = useState<'log' | 'notes'>(load('bezgomin.side') === 'notes' ? 'notes' : 'log');
+  useEffect(() => store('bezgomin.side', side), [side]);
 
   useEffect(() => store('bezgomin.tab', tab), [tab]);
-  useEffect(() => {
-    if (tab === 'notes') store('bezgomin.clues', String(v.journal.clues.length));
-  }, [tab, v.journal.clues.length]);
 
   useEffect(() => {
     if (!s.toast) return;
@@ -417,7 +370,6 @@ export function Game({ s }: { s: NetState }) {
       <main class="layout">
         <aside class="col-left only-desktop">
           <Stock v={v} />
-          {hasNotes && <Notes v={v} />}
         </aside>
         <div class={`col-mid ${tab === 'work' ? '' : 'hide-mobile'}`}>
           {work}
@@ -426,11 +378,33 @@ export function Game({ s }: { s: NetState }) {
           </div>
         </div>
         <div class={`col-notes only-mobile ${tab === 'notes' ? '' : 'hide-mobile'}`}>
-          <Notes v={v} />
+          {!desktop && <Notes v={v} seen={seen} markSeen={markSeen} active={tab === 'notes'} />}
         </div>
         <aside class={`col-right ${tab === 'log' ? '' : 'hide-mobile'}`}>
-          <h3 class="only-desktop">{T.tabLog}</h3>
-          <Log v={v} />
+          {desktop && hasNotes && (
+            <div class="side-switch" role="tablist">
+              <button role="tab" aria-selected={side === 'log'} class={side === 'log' ? 'on' : ''} onClick={() => setSide('log')}>
+                <IconLog />
+                {T.tabLog}
+              </button>
+              <button
+                role="tab"
+                aria-selected={side === 'notes'}
+                class={side === 'notes' ? 'on' : ''}
+                onClick={() => setSide('notes')}
+              >
+                <IconNotes />
+                {T.tabNotes}
+                {newNotes && side !== 'notes' && <span class="badge" />}
+              </button>
+            </div>
+          )}
+          {desktop && !hasNotes && <h3>{T.tabLog}</h3>}
+          {desktop && hasNotes && side === 'notes' ? (
+            <Notes v={v} seen={seen} markSeen={markSeen} active />
+          ) : (
+            <Log v={v} />
+          )}
         </aside>
       </main>
 

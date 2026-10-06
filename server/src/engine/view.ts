@@ -316,7 +316,7 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
     if (!rec.who.includes(pid)) continue;
     const def = g.ix.clues.get(id);
     if (!def) continue;
-    clues.push({ id, title: def.title, text: g.render(def.text, pid), personal: def.to !== 'both', at: rec.at });
+    clues.push({ id, title: def.title, text: g.render(def.text, pid), personal: def.to !== 'both', at: rec.at, mystery: def.mystery });
   }
   clues.sort((a, b) => b.at - a.at);
 
