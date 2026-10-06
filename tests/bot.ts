@@ -16,6 +16,13 @@ export interface BotOptions {
   declineRate?: number;
   /** Prefer leaving question hubs right away (exercises skipped dialogue). */
   impatient?: boolean;
+  /**
+   * A careless player: with this probability, spends resources on any routine action that
+   * consumes something (crafting, trading, salting), whether it is needed or not.
+   */
+  waste?: number;
+  /** With this probability, wanders off to another place for no reason. */
+  wander?: number;
 }
 
 const COMBAT_ORDER = ['bell', 'bow', 'torch', 'axe', 'knife', 'shout', 'guard', 'up'];
@@ -134,8 +141,16 @@ export class Bot {
         if (this.rng.chance(0.01)) return { c: 'act', id: this.rng.pick(travels).id };
       }
     }
-    const wanted = this.wanted(v, entries);
     const ready = entries.filter((e) => e.kind === 'act' && e.enabled && !(e.readyAt && e.readyAt > now));
+    if (this.o.wander && travels.length && this.rng.chance(this.o.wander)) return { c: 'act', id: this.rng.pick(travels).id };
+    if (this.o.waste && this.rng.chance(this.o.waste)) {
+      const spend = ready.filter((e) => {
+        const a = this.actions.get(e.id);
+        return a && !a.once && !a.oncePerPlayer && !this.travelTo.has(e.id) && Object.keys(a.cost ?? {}).length > 0;
+      });
+      if (spend.length) return { c: 'act', id: this.rng.pick(spend).id };
+    }
+    const wanted = this.wanted(v, entries);
     const supper = entries.find((e) => e.kind === 'pool' && e.enabled);
     const storyWaiting = entries.some((e) => e.kind === 'scene' && !e.enabled && e.reason && e.cost?.some((c) => !c.ok));
 

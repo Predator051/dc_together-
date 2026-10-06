@@ -129,8 +129,11 @@ export function validateContent(c: Content): Report {
   const checkRes = (where: string, m: Record<string, unknown> | undefined) => {
     for (const k of Object.keys(m ?? {})) if (!res.has(k)) err(`${where}: unknown resource ${k}`);
   };
+  /** Resources something asks for (outside fights, where every cost is optional): resource → where. */
+  const required = new Map<string, string>();
   const checkCost = (where: string, cost: Record<string, number> | undefined) => {
     checkRes(where, cost);
+    if (!where.startsWith('encounter')) for (const k of Object.keys(cost ?? {})) if (!required.has(k)) required.set(k, where);
     for (const [k, n] of Object.entries(cost ?? {})) {
       if (!Number.isInteger(n) || n <= 0) err(`${where}: bad cost ${k}=${n}`);
       if (n > maxCap(k)) err(`${where}: cost ${k}=${n} exceeds storage cap ${maxCap(k)}`);
@@ -171,6 +174,7 @@ export function validateContent(c: Content): Report {
       if ('noPflag' in x && !pwritten.has(x.noPflag)) err(`${where}: reads personal flag "${x.noPflag}" that is never set`);
       if ('partnerPflag' in x && !pwritten.has(x.partnerPflag)) err(`${where}: reads personal flag "${x.partnerPflag}" that is never set`);
       if ('res' in x && !res.has(x.res)) err(`${where}: unknown resource ${x.res}`);
+      if ('res' in x && x.gte !== undefined && x.gte > 0 && !required.has(x.res)) required.set(x.res, where);
       if (('clue' in x && !clues.has(x.clue)) || ('anyClue' in x && !clues.has(x.anyClue))) err(`${where}: unknown clue`);
       if ('rel' in x && !npcs.has(x.rel)) err(`${where}: unknown npc ${x.rel}`);
       if (('at' in x && !areas.has(x.at)) || ('partnerAt' in x && !areas.has(x.partnerAt))) err(`${where}: unknown area`);
@@ -358,10 +362,47 @@ export function validateContent(c: Content): Report {
   for (const x of c.clues) if (!reachable.clues.has(x.id)) err(`clue ${x.id} is never granted`);
   for (const act of Object.keys(c.actEnd)) if (!reachable.flags.has(`act:${act}`)) err(`act ${act} cannot be finished`);
 
+  // Nothing a player may need can run out for good: everything asked for must have a renewable
+  // source — a repeatable, reachable action that yields it and is itself fed by renewable things.
+  // Unique items (tools, people) are exempt: they are given by the story and never spent at will.
+  // Hidden reservoirs (a cellar, a scrap heap) are finite on purpose; what they hold must be
+  // renewable elsewhere, and that is checked for the visible resource itself.
+  const renew = renewable(c, reachable.actions);
+  for (const [r, where] of required) {
+    const def = c.resources.find((x) => x.id === r);
+    if (!def || def.kind === 'tool' || def.kind === 'people' || def.hidden) continue;
+    if (!renew.has(r)) err(`resource ${r} (needed by ${where}) has no renewable source: a careless player could run out for good`);
+  }
+
   return { errors, warnings, reachable };
 }
 
 /** Optimistic fixpoint: what can ever become available. */
+/** Resources that can be produced again and again by reachable, repeatable actions. */
+export function renewable(c: Content, reachableActions: Set<string>): Set<string> {
+  const out = new Set<string>();
+  const kindOf = new Map(c.resources.map((r) => [r.id, r.kind]));
+  const usable = (k: string) => out.has(k) || kindOf.get(k) === 'tool' || kindOf.get(k) === 'people';
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const a of c.actions) {
+      if (a.once || a.oncePerPlayer || !reachableActions.has(a.id)) continue;
+      if (!Object.keys(a.cost ?? {}).every(usable)) continue;
+      const made = [
+        ...Object.entries(a.yield ?? {}).filter(([, y]) => (Array.isArray(y) ? y[1] : y) > 0).map(([k]) => k),
+        ...(a.chance ?? []).flatMap((ch) => Object.entries(ch.add ?? {}).filter(([, n]) => n > 0).map(([k]) => k)),
+      ];
+      for (const k of made)
+        if (!out.has(k)) {
+          out.add(k);
+          changed = true;
+        }
+    }
+  }
+  return out;
+}
+
 function simulate(c: Content) {
   const flags = new Set<string>(['built:none']);
   const pflags = new Set<string>();

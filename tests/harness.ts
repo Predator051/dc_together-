@@ -75,13 +75,16 @@ export interface AutoplayResult {
 export function autoplay(
   a: BotOptions,
   b: BotOptions,
-  opts: { seed?: number; maxSteps?: number; until?: (w: World) => boolean; stallLimit?: number } = {},
+  opts: { seed?: number; maxSteps?: number; until?: (w: World) => boolean; stallLimit?: number; from?: World } = {},
 ): AutoplayResult {
-  const w = new World(opts.seed ?? 7);
-  const p1 = w.join('Марко', 'm', 'hunter');
-  const p2 = w.join('Оксана', 'f', 'maker');
-  w.online(p1);
-  w.online(p2);
+  // Either a fresh world, or carry on in one that was played (and perhaps tampered with) before.
+  const w = opts.from ?? new World(opts.seed ?? 7);
+  if (!opts.from) {
+    w.join('Марко', 'm', 'hunter');
+    w.join('Оксана', 'f', 'maker');
+  }
+  w.online('p1');
+  w.online('p2');
   const bots: Record<PlayerId, Bot> = {
     p1: new Bot('A', content, a),
     p2: new Bot('B', content, b),
