@@ -36,6 +36,41 @@ const WOOD = '170, 120, 70';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
+type Look = 'chips' | 'curls' | 'sparks' | 'flare' | 'rings' | 'steam' | 'puffs' | 'streak' | 'prints' | 'none';
+/** How each kind of action shows itself, and how often it "beats" (one particle burst + one sound). */
+const LOOKS: Record<Fx, { look: Look; every: number }> = {
+  fire: { look: 'flare', every: 1.4 },
+  flint: { look: 'sparks', every: 0.9 },
+  forge: { look: 'sparks', every: 0.7 },
+  whet: { look: 'sparks', every: 1.2 },
+  chop: { look: 'chips', every: 1.1 },
+  water: { look: 'rings', every: 1.6 },
+  fish: { look: 'rings', every: 2.4 },
+  row: { look: 'rings', every: 1.5 },
+  steam: { look: 'steam', every: 0.3 },
+  walk: { look: 'prints', every: 0.5 },
+  twigs: { look: 'prints', every: 0.5 },
+  snare: { look: 'prints', every: 0.55 },
+  send: { look: 'prints', every: 0.35 },
+  arrow: { look: 'streak', every: 2.6 },
+  string: { look: 'curls', every: 1.6 },
+  carve: { look: 'curls', every: 0.9 },
+  rope: { look: 'curls', every: 1.3 },
+  build: { look: 'puffs', every: 1.2 },
+  rubble: { look: 'puffs', every: 1.3 },
+  scrap: { look: 'puffs', every: 1.4 },
+  sift: { look: 'puffs', every: 1.1 },
+  rummage: { look: 'none', every: 1.3 },
+  bowl: { look: 'none', every: 1.8 },
+  salt: { look: 'none', every: 1.2 },
+  wax: { look: 'none', every: 0.9 },
+  hive: { look: 'none', every: 2.2 },
+  trade: { look: 'none', every: 1.8 },
+  care: { look: 'none', every: 2.4 },
+  breath: { look: 'none', every: 3.4 },
+  heart: { look: 'none', every: 1.05 },
+};
+
 class Engine {
   private bctx: CanvasRenderingContext2D | null;
   private fctx: CanvasRenderingContext2D | null;
@@ -211,47 +246,43 @@ class Engine {
 
   private emit(who: string, fx: Fx, x0: number, y0: number, dt: number, mate: boolean, room: number) {
     const k = `${who}:${fx}`;
-    const beat = (every: number) => {
-      const go = this.tick(k, dt, every);
-      if (go) this.onBeat(fx, mate);
-      return go;
-    };
+    const look = LOOKS[fx];
+    if (!this.tick(k, dt, look.every)) return;
+    this.onBeat(fx, mate);
+    if (!this.fctx) return;
     const tint = mate ? GALL : null;
     const a = mate ? 0.55 : 1;
     const push = (p: Omit<P, 'age' | 'rot' | 'vr'> & Partial<P>) => this.front.push({ age: 0, rot: 0, vr: 0, ...p, alpha: p.alpha * a });
-    switch (fx) {
-      case 'chop':
-        if (beat(0.9))
-          for (let i = 0; i < 6; i++)
-            push({ x: x0 + rnd(-10, 10), y: y0, vx: rnd(-90, 90), vy: rnd(-220, -120), life: 1.1, size: rnd(2, 4), rot: rnd(0, 6), vr: rnd(-8, 8), shape: 'chip', color: tint ?? WOOD, alpha: 0.9 });
+    switch (look.look) {
+      case 'chips':
+        for (let i = 0; i < 6; i++)
+          push({ x: x0 + rnd(-10, 10), y: y0, vx: rnd(-90, 90), vy: rnd(-220, -120), life: 1.1, size: rnd(2, 4), rot: rnd(0, 6), vr: rnd(-8, 8), shape: 'chip', color: tint ?? WOOD, alpha: 0.9 });
         break;
-      case 'shavings':
-        if (beat(1.1))
-          for (let i = 0; i < 3; i++)
-            push({ x: x0 + rnd(-20, 20), y: y0 - 30, vx: rnd(-20, 20), vy: rnd(10, 30), life: 1.2, size: rnd(3, 5), rot: rnd(0, 6), vr: rnd(-3, 3), shape: 'curl', color: tint ?? WOOD, alpha: 0.75 });
+      case 'curls':
+        for (let i = 0; i < 3; i++)
+          push({ x: x0 + rnd(-20, 20), y: y0 - 30, vx: rnd(-20, 20), vy: rnd(10, 30), life: 1.2, size: rnd(3, 5), rot: rnd(0, 6), vr: rnd(-3, 3), shape: 'curl', color: tint ?? WOOD, alpha: 0.75 });
         break;
       case 'sparks':
-      case 'fire':
-        if (beat(fx === 'fire' ? 0.35 : 0.6))
-          for (let i = 0; i < (fx === 'fire' ? 5 : 8); i++)
-            push({ x: x0 + rnd(-8, 8), y: y0, vx: rnd(-70, 70), vy: rnd(-200, -80), life: rnd(0.6, 1.1), size: rnd(1, 2), shape: 'dot', color: tint ?? EMBER, alpha: 1, glow: true });
+      case 'flare': {
+        const n = look.look === 'flare' ? 14 : 8;
+        for (let i = 0; i < n; i++)
+          push({ x: x0 + rnd(-8, 8), y: y0, vx: rnd(-70, 70), vy: rnd(-200, -80), life: rnd(0.6, 1.1), size: rnd(1, 2), shape: 'dot', color: tint ?? EMBER, alpha: 1, glow: true });
         break;
-      case 'water':
-        if (beat(1.1)) push({ x: x0 + rnd(-30, 30), y: y0 - rnd(0, 6), vx: 0, vy: 0, life: 1.8, size: 70, shape: 'ring', color: tint ?? GALL, alpha: 0.5 });
+      }
+      case 'rings':
+        push({ x: x0 + rnd(-30, 30), y: y0 - rnd(0, 6), vx: 0, vy: 0, life: 1.8, size: 70, shape: 'ring', color: tint ?? GALL, alpha: 0.5 });
         break;
       case 'steam':
-        if (beat(0.25)) push({ x: x0 + rnd(-15, 15), y: y0, vx: rnd(-8, 8), vy: rnd(-40, -25), life: 2.2, size: rnd(6, 10), shape: 'puff', color: tint ?? INK, alpha: 0.12 });
+        push({ x: x0 + rnd(-15, 15), y: y0, vx: rnd(-8, 8), vy: rnd(-40, -25), life: 2.2, size: rnd(6, 10), shape: 'puff', color: tint ?? INK, alpha: 0.12 });
         break;
-      case 'dust':
-        if (beat(0.8))
-          for (let i = 0; i < 8; i++)
-            push({ x: x0 + rnd(-12, 12), y: y0, vx: rnd(-60, 60), vy: rnd(-40, -5), life: 1.4, size: rnd(4, 9), shape: 'puff', color: tint ?? INK, alpha: 0.1 });
+      case 'puffs':
+        for (let i = 0; i < 8; i++)
+          push({ x: x0 + rnd(-12, 12), y: y0, vx: rnd(-60, 60), vy: rnd(-40, -5), life: 1.4, size: rnd(4, 9), shape: 'puff', color: tint ?? INK, alpha: 0.1 });
         break;
-      case 'arrow':
-        if (beat(2.2)) push({ x: -40, y: y0 - rnd(30, 120), vx: this.w * 1.6, vy: 0, life: 0.9, size: 40, shape: 'streak', color: tint ?? INK, alpha: 0.5 });
+      case 'streak':
+        push({ x: -40, y: y0 - rnd(30, 120), vx: this.w * 1.6, vy: 0, life: 0.9, size: 40, shape: 'streak', color: tint ?? INK, alpha: 0.5 });
         break;
-      case 'walk': {
-        if (!beat(0.5)) break;
+      case 'prints': {
         // a short track that crosses the spot where the accent lives
         const span = Math.max(80, room * 0.9);
         const start = x0 - span / 2;
@@ -261,6 +292,8 @@ class Engine {
         push({ x: start + x, y: y0 + (this.stepNo % 2 ? -4 : 4), vx: 0, vy: 0, life: 3.5, size: 4, shape: 'print', color: tint ?? INK, alpha: 0.32, side: this.stepNo % 2 });
         break;
       }
+      case 'none':
+        break;
     }
   }
 

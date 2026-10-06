@@ -338,8 +338,38 @@ export interface StoveDef {
 
 /** Backdrop of the place a player is in. */
 export type AmbientKind = 'cellar' | 'candle' | 'snow' | 'river' | 'cave';
-/** Short visual accent while an action runs. */
-export type FxKind = 'fire' | 'sparks' | 'chop' | 'water' | 'steam' | 'walk' | 'arrow' | 'shavings' | 'dust';
+/** What an action looks and sounds like while it runs (each kind has its own sound). */
+export type FxKind =
+  | 'fire' // stoking a fire
+  | 'flint' // striking a light
+  | 'forge' // hammer on hot iron
+  | 'whet' // whetstone on a blade
+  | 'chop' // axe into wood
+  | 'water' // bucket, water drawn
+  | 'fish' // line cast, fish trap
+  | 'row' // oars, crossing water
+  | 'steam' // pot on the fire
+  | 'walk' // steps
+  | 'twigs' // steps and snapping dry wood
+  | 'snare' // steps and a creaking noose
+  | 'send' // several people walking off
+  | 'arrow' // bowstring and arrow
+  | 'string' // fitting a bowstring
+  | 'carve' // knife whittling
+  | 'rope' // twisting fibre
+  | 'build' // hammering wood
+  | 'rubble' // stones and earth
+  | 'scrap' // scrap iron
+  | 'sift' // flour
+  | 'rummage' // searching chests and sacks
+  | 'bowl' // feeding an animal
+  | 'salt' // knife, board and salt
+  | 'wax' // kneading wax
+  | 'hive' // a hive in winter
+  | 'trade' // sacks changing hands
+  | 'care' // pouring a drink, a spoon
+  | 'breath' // slow breathing
+  | 'heart'; // a heartbeat
 
 /** Purely visual ambience: never affects rules. */
 export interface AmbientDef {

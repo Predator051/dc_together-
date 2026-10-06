@@ -316,6 +316,12 @@ export function Game({ s }: { s: NetState }) {
 
   useEffect(() => store('bezgomin.tab', tab), [tab]);
 
+  // The partner calls you: a knock.
+  const calling = v.proposal && !v.proposal.mine ? v.proposal.label : null;
+  useEffect(() => {
+    if (calling) sound.call();
+  }, [calling]);
+
   useEffect(() => {
     if (!s.toast) return;
     const id = window.setTimeout(() => net.clearToast(), 2500);
