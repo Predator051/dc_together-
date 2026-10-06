@@ -5,8 +5,9 @@ import type { NetState } from './net.js';
 import { net } from './net.js';
 import { Ambient } from './ambient.js';
 import { Notes, useSeenClues } from './notes.js';
+import { sound } from './sound.js';
 import { Scene } from './scene.js';
-import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconWork } from './icons.js';
+import { IconFlame, IconLock, IconLog, IconMute, IconNotes, IconPair, IconPin, IconSnow, IconSound, IconWork } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -231,6 +232,17 @@ function Stock({ v }: { v: PlayerView }) {
   );
 }
 
+function SoundToggle() {
+  const [, force] = useState(0);
+  useEffect(() => sound.subscribe(() => force((x) => x + 1)), []);
+  const label = sound.on ? T.soundOff : T.soundOn;
+  return (
+    <button class={`sound-toggle ${sound.on ? 'on' : ''}`} aria-label={label} title={label} onClick={() => sound.toggle()}>
+      {sound.on ? <IconSound /> : <IconMute />}
+    </button>
+  );
+}
+
 function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: number }) {
   const p = v.partner;
   if (!p.joined)
@@ -361,6 +373,7 @@ export function Game({ s }: { s: NetState }) {
               {T.day} {v.day}
             </span>
           )}
+          <SoundToggle />
           <span class={`net ${s.connected ? 'ok' : 'bad'}`} title={s.connected ? T.onlineDot : T.offlineDot} />
         </div>
         <Partner v={v} now={now} offset={s.offset} />

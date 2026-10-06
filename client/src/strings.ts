@@ -88,6 +88,8 @@ export const T = {
   sec: 'с',
   have: 'є',
   deltaBoth: 'Разом',
+  soundOn: 'Увімкнути звук',
+  soundOff: 'Вимкнути звук',
 };
 
 export type Strings = typeof T;

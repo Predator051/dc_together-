@@ -516,6 +516,30 @@ b {
   color: var(--ink-2);
   white-space: nowrap;
 }
+.sound-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -4px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--pale);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sound-toggle.on {
+  color: var(--ochre-ink);
+}
+.sound-toggle:focus-visible {
+  outline: 2px solid var(--ochre);
+}
+.sound-toggle .ico {
+  width: 20px;
+  height: 20px;
+}
 .net {
   width: 7px;
   height: 7px;

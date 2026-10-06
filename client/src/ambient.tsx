@@ -3,6 +3,7 @@
 // and does not animate at all for people who ask for reduced motion.
 import { useEffect, useRef } from 'preact/hooks';
 import type { AmbientView } from '../../shared/src/protocol.js';
+import { sound } from './sound.js';
 
 type Fx = NonNullable<AmbientView['fx']>;
 
@@ -36,8 +37,8 @@ const WOOD = '170, 120, 70';
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
 class Engine {
-  private bctx: CanvasRenderingContext2D;
-  private fctx: CanvasRenderingContext2D;
+  private bctx: CanvasRenderingContext2D | null;
+  private fctx: CanvasRenderingContext2D | null;
   private w = 0;
   private h = 0;
   private dpr = 1;
@@ -51,12 +52,14 @@ class Engine {
   private stepNo = 0;
   private walkX = new Map<string, number>();
 
+  /** Without canvases (reduced motion) the engine only keeps the beat for sounds. */
   constructor(
-    private bc: HTMLCanvasElement,
-    private fc: HTMLCanvasElement,
+    private bc: HTMLCanvasElement | null,
+    private fc: HTMLCanvasElement | null,
+    private onBeat: (fx: Fx, mate: boolean) => void,
   ) {
-    this.bctx = bc.getContext('2d')!;
-    this.fctx = fc.getContext('2d')!;
+    this.bctx = bc?.getContext('2d') ?? null;
+    this.fctx = fc?.getContext('2d') ?? null;
     this.resize();
     window.addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.wake);
@@ -80,15 +83,17 @@ class Engine {
     this.w = window.innerWidth;
     this.h = window.innerHeight;
     for (const c of [this.bc, this.fc]) {
+      if (!c) continue;
       c.width = Math.round(this.w * this.dpr);
       c.height = Math.round(this.h * this.dpr);
     }
-    this.bctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.fctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.bctx?.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.fctx?.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   };
 
   private wake = () => {
     if (this.raf || this.s.paused || document.hidden) return;
+    if (!this.bctx && !this.s.fx && !this.s.partnerFx) return;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
   };
@@ -106,10 +111,15 @@ class Engine {
     if (this.s.paused || document.hidden) return;
     const dt = Math.min(0.05, (t - this.last) / 1000);
     this.last = t;
-    this.weather(dt);
     this.accents(dt);
-    this.draw(this.bctx, this.back, dt);
-    this.draw(this.fctx, this.front, dt);
+    if (this.bctx && this.fctx) {
+      this.weather(dt);
+      this.draw(this.bctx, this.back, dt);
+      this.draw(this.fctx, this.front, dt);
+    } else {
+      this.front.length = 0;
+      if (!this.s.fx && !this.s.partnerFx) return;
+    }
     this.raf = requestAnimationFrame(this.frame);
   };
 
@@ -181,42 +191,47 @@ class Engine {
 
   private emit(who: string, fx: Fx, x0: number, y0: number, dt: number, mate: boolean) {
     const k = `${who}:${fx}`;
+    const beat = (every: number) => {
+      const go = this.tick(k, dt, every);
+      if (go) this.onBeat(fx, mate);
+      return go;
+    };
     const tint = mate ? GALL : null;
     const a = mate ? 0.55 : 1;
     const push = (p: Omit<P, 'age' | 'rot' | 'vr'> & Partial<P>) => this.front.push({ age: 0, rot: 0, vr: 0, ...p, alpha: p.alpha * a });
     switch (fx) {
       case 'chop':
-        if (this.tick(k, dt, 0.9))
+        if (beat(0.9))
           for (let i = 0; i < 6; i++)
             push({ x: x0 + rnd(-10, 10), y: y0, vx: rnd(-90, 90), vy: rnd(-220, -120), life: 1.1, size: rnd(2, 4), rot: rnd(0, 6), vr: rnd(-8, 8), shape: 'chip', color: tint ?? WOOD, alpha: 0.9 });
         break;
       case 'shavings':
-        if (this.tick(k, dt, 1.1))
+        if (beat(1.1))
           for (let i = 0; i < 3; i++)
             push({ x: x0 + rnd(-20, 20), y: y0 - 30, vx: rnd(-20, 20), vy: rnd(10, 30), life: 1.2, size: rnd(3, 5), rot: rnd(0, 6), vr: rnd(-3, 3), shape: 'curl', color: tint ?? WOOD, alpha: 0.75 });
         break;
       case 'sparks':
       case 'fire':
-        if (this.tick(k, dt, fx === 'fire' ? 0.35 : 0.6))
+        if (beat(fx === 'fire' ? 0.35 : 0.6))
           for (let i = 0; i < (fx === 'fire' ? 5 : 8); i++)
             push({ x: x0 + rnd(-8, 8), y: y0, vx: rnd(-70, 70), vy: rnd(-200, -80), life: rnd(0.6, 1.1), size: rnd(1, 2), shape: 'dot', color: tint ?? EMBER, alpha: 1, glow: true });
         break;
       case 'water':
-        if (this.tick(k, dt, 1.1)) push({ x: x0 + rnd(-30, 30), y: y0 - rnd(0, 6), vx: 0, vy: 0, life: 1.8, size: 70, shape: 'ring', color: tint ?? GALL, alpha: 0.5 });
+        if (beat(1.1)) push({ x: x0 + rnd(-30, 30), y: y0 - rnd(0, 6), vx: 0, vy: 0, life: 1.8, size: 70, shape: 'ring', color: tint ?? GALL, alpha: 0.5 });
         break;
       case 'steam':
-        if (this.tick(k, dt, 0.25)) push({ x: x0 + rnd(-15, 15), y: y0, vx: rnd(-8, 8), vy: rnd(-40, -25), life: 2.2, size: rnd(6, 10), shape: 'puff', color: tint ?? INK, alpha: 0.12 });
+        if (beat(0.25)) push({ x: x0 + rnd(-15, 15), y: y0, vx: rnd(-8, 8), vy: rnd(-40, -25), life: 2.2, size: rnd(6, 10), shape: 'puff', color: tint ?? INK, alpha: 0.12 });
         break;
       case 'dust':
-        if (this.tick(k, dt, 0.8))
+        if (beat(0.8))
           for (let i = 0; i < 8; i++)
             push({ x: x0 + rnd(-12, 12), y: y0, vx: rnd(-60, 60), vy: rnd(-40, -5), life: 1.4, size: rnd(4, 9), shape: 'puff', color: tint ?? INK, alpha: 0.1 });
         break;
       case 'arrow':
-        if (this.tick(k, dt, 2.2)) push({ x: -40, y: y0 - rnd(30, 120), vx: this.w * 1.6, vy: 0, life: 0.9, size: 40, shape: 'streak', color: tint ?? INK, alpha: 0.5 });
+        if (beat(2.2)) push({ x: -40, y: y0 - rnd(30, 120), vx: this.w * 1.6, vy: 0, life: 0.9, size: 40, shape: 'streak', color: tint ?? INK, alpha: 0.5 });
         break;
       case 'walk': {
-        if (!this.tick(k, dt, 0.5)) break;
+        if (!beat(0.5)) break;
         const start = mate ? this.w * 0.55 : this.w * 0.08;
         const span = this.w * 0.35;
         const x = this.walkX.get(who) ?? 0;
@@ -341,8 +356,7 @@ export function Ambient({ a, paused }: { a: AmbientView; paused: boolean }) {
   const still = reducedMotion();
 
   useEffect(() => {
-    if (still || !backRef.current || !frontRef.current) return;
-    engine.current = new Engine(backRef.current, frontRef.current);
+    engine.current = new Engine(still ? null : backRef.current, still ? null : frontRef.current, (fx, mate) => sound.beat(fx, mate));
     return () => {
       engine.current?.destroy();
       engine.current = null;
@@ -351,6 +365,7 @@ export function Ambient({ a, paused }: { a: AmbientView; paused: boolean }) {
 
   useEffect(() => {
     engine.current?.set({ ...a, paused });
+    sound.set({ ...a, scene: paused });
   }, [a.kind, a.fire, a.fx, a.partnerFx, paused]);
 
   return (
