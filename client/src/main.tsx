@@ -3,8 +3,21 @@ import { useEffect, useState } from 'preact/hooks';
 import { Game } from './game.js';
 import { Join } from './join.js';
 import { net, type NetState } from './net.js';
-import { IconFlame } from './icons.js';
 import { T } from './strings.js';
+import '@fontsource/alegreya/cyrillic-400.css';
+import '@fontsource/alegreya/latin-400.css';
+import '@fontsource/alegreya/cyrillic-400-italic.css';
+import '@fontsource/alegreya/latin-400-italic.css';
+import '@fontsource/alegreya/cyrillic-600.css';
+import '@fontsource/alegreya/latin-600.css';
+import '@fontsource/alegreya/cyrillic-700.css';
+import '@fontsource/alegreya/latin-700.css';
+import '@fontsource/alegreya-sans/cyrillic-400.css';
+import '@fontsource/alegreya-sans/latin-400.css';
+import '@fontsource/alegreya-sans/cyrillic-500.css';
+import '@fontsource/alegreya-sans/latin-500.css';
+import '@fontsource/alegreya-sans/cyrillic-700.css';
+import '@fontsource/alegreya-sans/latin-700.css';
 import './styles.css';
 
 function App() {
@@ -17,7 +30,6 @@ function App() {
   return (
     <div class="join">
       <div class="join-card">
-        <IconFlame class="logo-mark" />
         <h1 class="logo">{T.title}</h1>
         <p class="muted center">{s.connected ? T.loading : T.reconnecting}</p>
       </div>

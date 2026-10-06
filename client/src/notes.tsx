@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { ClueView, PlayerView } from '../../shared/src/protocol.js';
-import { IconClose, IconDown, IconEye, IconSearch } from './icons.js';
+import { IconClose, IconDown, IconSearch } from './icons.js';
 import { T } from './strings.js';
 
 const SEEN_KEY = 'bezgomin.seen';
@@ -251,7 +251,9 @@ export function Notes({
                         <b>{hl(c.title, needle)}</b>
                         {c.personal && (
                           <span class="pill mine">
-                            <IconEye />
+                            <span class="pilcrow" aria-hidden="true">
+                              ¶
+                            </span>
                             {T.personalShort}
                           </span>
                         )}

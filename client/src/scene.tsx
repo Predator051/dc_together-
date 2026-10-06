@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { PlayerView, SceneView } from '../../shared/src/protocol.js';
 import { net } from './net.js';
-import { IconCheck, IconChevron, IconEye } from './icons.js';
+import { IconCheck, IconChevron } from './icons.js';
 import { T } from './strings.js';
 
 function Bar({ value, max, kind }: { value: number; max: number; kind: string }) {
@@ -62,7 +62,9 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
               {b.own.length > 0 && (
                 <div class="own">
                   <div class="own-label">
-                    <IconEye />
+                    <span class="pilcrow" aria-hidden="true">
+                      ¶
+                    </span>
                     {T.personal}
                   </div>
                   {b.own.map((p) => (

@@ -1,11 +1,11 @@
 import type { JSX } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EntryView, GroupView, PlayerView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
 import { Notes, useSeenClues } from './notes.js';
 import { Scene } from './scene.js';
-import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconTarget, IconWork } from './icons.js';
+import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconWork } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -90,6 +90,22 @@ interface Ctx {
   locked: boolean;
 }
 
+/** A one-off "echo" ring when a task this tile was running comes to an end. */
+function useEcho(running: boolean): number {
+  const [ring, setRing] = useState(0);
+  const was = useRef(running);
+  useEffect(() => {
+    if (was.current && !running) setRing(Date.now());
+    was.current = running;
+  }, [running]);
+  useEffect(() => {
+    if (!ring) return;
+    const id = window.setTimeout(() => setRing(0), 1200);
+    return () => window.clearTimeout(id);
+  }, [ring]);
+  return ring;
+}
+
 function Entry({ e, c }: { e: EntryView; c: Ctx }) {
   const { v, now } = c;
   const busy = v.busyUntil + SAFETY_MS > now;
@@ -100,6 +116,7 @@ function Entry({ e, c }: { e: EntryView; c: Ctx }) {
   const gains = e.gain ?? [];
   const costs = e.cost ?? [];
   const meta = gains.length > 0 || costs.length > 0 || !!reason || !!e.hint;
+  const ring = useEcho(mine);
 
   return (
     <button
@@ -108,6 +125,7 @@ function Entry({ e, c }: { e: EntryView; c: Ctx }) {
       onClick={() => net.send({ c: 'act', id: e.id })}
     >
       {mine && <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={c.offset} cls="tile-fill" />}
+      {ring > 0 && <span key={ring} class="ring" aria-hidden="true" />}
       <span class="tile-top">
         <span class="tile-label">{e.label}</span>
         {mine ? (
@@ -173,54 +191,40 @@ function Stock({ v }: { v: PlayerView }) {
   const folk = v.res.filter((r) => r.kind === 'people' && r.n > 0);
   if (res.length === 0 && tools.length === 0 && folk.length === 0) return null;
   return (
-    <section class="panel stock">
+    <section class="stock">
       {res.length > 0 && (
         <>
           <h3>{T.stock}</h3>
-          <div class="res-grid">
-            {res.map((r) => {
-              const full = r.cap !== undefined && r.n >= r.cap;
-              const pct = r.cap ? Math.min(100, (r.n / r.cap) * 100) : 0;
-              return (
-                <div class={`res ${full ? 'full' : ''} ${r.n === 0 ? 'empty' : ''}`}>
-                  <span class="res-name">{r.name}</span>
-                  <span class="res-n">
-                    {r.n}
-                    {r.cap !== undefined && <small>/{r.cap}</small>}
-                  </span>
-                  {r.cap !== undefined && (
-                    <span class="res-bar" aria-hidden="true">
-                      <span style={{ width: `${pct}%` }} />
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <dl class="ledger">
+            {res.map((r) => (
+              <div
+                class={`ledger-row ${r.cap !== undefined && r.n >= r.cap ? 'full' : ''} ${r.n === 0 ? 'empty' : ''}`}
+              >
+                <dt>{r.name}</dt>
+                <dd>
+                  {r.n}
+                  {r.cap !== undefined && <small>/{r.cap}</small>}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </>
       )}
       {folk.length > 0 && (
-        <>
-          <h3>{T.folk}</h3>
-          <div class="chips">
-            {folk.map((r) => (
-              <span class="chip folk">
-                <span>{r.name}</span>
-                <b>{r.n}</b>
-              </span>
-            ))}
-          </div>
-        </>
+        <p class="inline-list folk">
+          <span class="il-head">{T.folk}:</span>{' '}
+          {folk.map((r, i) => (
+            <span>
+              {i > 0 && ', '}
+              {r.name} <b>{r.n}</b>
+            </span>
+          ))}
+        </p>
       )}
       {tools.length > 0 && (
-        <>
-          <h3>{T.items}</h3>
-          <div class="chips">
-            {tools.map((r) => (
-              <span class="chip tool">{r.name}</span>
-            ))}
-          </div>
-        </>
+        <p class="inline-list tools">
+          <span class="il-head">{T.items}:</span> {tools.map((r) => r.name).join(', ')}.
+        </p>
       )}
     </section>
   );
@@ -239,7 +243,10 @@ function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: numbe
   const status = !p.online ? T.partnerOffline : working ? working.text : T.partnerIdle;
   return (
     <div class={`mate ${p.online ? 'on' : 'off'}`}>
-      <span class="avatar">{p.name.slice(0, 1).toUpperCase()}</span>
+      <span class="avatar">
+        {p.name.slice(0, 1).toUpperCase()}
+        {working && <span key={working.from} class="ring" aria-hidden="true" />}
+      </span>
       <span class="mate-body">
         <span class="mate-line">
           <b>{p.name}</b>
@@ -319,13 +326,9 @@ export function Game({ s }: { s: NetState }) {
         </section>
       )}
       {v.goal && (
-        <div class="goal">
-          <IconTarget />
-          <span>
-            <span class="goal-label">{T.goal}</span>
-            {v.goal}
-          </span>
-        </div>
+        <p class="goal">
+          <span class="goal-label">{T.goal}.</span> {v.goal}
+        </p>
       )}
       {v.stove.text && (
         <p class={`stove ${v.stove.state}`}>
@@ -441,7 +444,10 @@ export function Game({ s }: { s: NetState }) {
           ) : (
             <>
               <span class="proposal-text">
-                <IconPair />
+                <span class="call">
+                  <IconPair />
+                  <span class="ring" aria-hidden="true" />
+                </span>
                 <span>
                   {v.proposal.text} <b>«{v.proposal.label}»</b>
                 </span>
