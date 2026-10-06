@@ -1,7 +1,8 @@
 /* ==========================================================================
    Bezgomin — "Litopys": a chronicle kept by candlelight.
    Smoked parchment, ink, cinnabar rubrics, ochre for what is done together.
-   Alegreya for the chronicle itself, Alegreya Sans for numbers and controls.
+   Literata for the chronicle itself (calm, made for long reading on screens),
+   Commissioner for numbers, controls and labels. Italic only where it means something.
    One motif of motion: an echo ring, and only when something happens.
    ========================================================================== */
 
@@ -28,8 +29,8 @@
   --verdigris: #8db08f;
 
   --nav-h: 64px;
-  --serif: 'Alegreya', 'Iowan Old Style', Palatino, Georgia, serif;
-  --sans: 'Alegreya Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif: 'Literata', 'Iowan Old Style', Palatino, Georgia, serif;
+  --sans: 'Commissioner', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --shadow: 0 14px 40px rgba(8, 5, 2, 0.55);
   color-scheme: dark;
 }
@@ -44,11 +45,10 @@ body {
   padding: 0;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
-  font-variant-numeric: oldstyle-nums;
 }
 
 body {
@@ -76,11 +76,11 @@ h3 {
 h2 {
   font-size: 1.25rem;
 }
-/* Section names read like headings in a ledger: italic, quiet, sentence case. */
+/* Section names: quiet sans, sentence case. */
 h3 {
-  font-size: 1rem;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--faded);
 }
 p {
@@ -207,8 +207,8 @@ b {
   font-size: 0.95rem;
 }
 .reason {
-  font-style: italic;
-  font-size: 0.9rem;
+  font-family: var(--sans);
+  font-size: 0.88rem;
   color: var(--faded);
 }
 .btn:focus-visible,
@@ -241,15 +241,10 @@ b {
 }
 .pill.mine {
   color: var(--faded);
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.88rem;
 }
 .pill.new {
   color: var(--cinnabar-ink);
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 /* ---------- join ---------- */
@@ -267,7 +262,7 @@ b {
 }
 .logo {
   margin-bottom: 0;
-  font-size: 3.2rem;
+  font-size: 2.8rem;
   font-weight: 400;
   text-align: center;
   letter-spacing: 0.02em;
@@ -280,7 +275,6 @@ b {
 .join .subtitle {
   margin-bottom: 28px;
   text-align: center;
-  font-style: italic;
   color: var(--faded);
 }
 .join-card form,
@@ -298,7 +292,9 @@ b {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  font-weight: 500;
   color: var(--faded);
 }
 .field input {
@@ -339,14 +335,20 @@ b {
   color: var(--ink);
 }
 .role b {
-  font-size: 1.2rem;
+  font-family: var(--serif);
+  font-size: 1.12rem;
 }
 .role span {
-  font-size: 0.98rem;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 0.95rem;
   color: var(--ink-2);
 }
 .role em {
-  font-size: 0.9rem;
+  font-family: var(--sans);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.85rem;
   color: var(--pale);
 }
 .role.on {
@@ -420,7 +422,8 @@ b {
   height: 0.95em;
 }
 .day {
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.9rem;
   color: var(--ink-2);
   white-space: nowrap;
 }
@@ -441,7 +444,8 @@ b {
 .warn-bar {
   margin-top: 8px;
   color: var(--cinnabar-ink);
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.9rem;
 }
 
 /* partner */
@@ -532,7 +536,8 @@ b {
   flex: 1;
   min-width: 0;
   color: var(--gall);
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.9rem;
 }
 .mate.off .mate-status {
   color: var(--pale);
@@ -579,7 +584,7 @@ b {
 /* The goal is a rubric: written in cinnabar, like the headings of an old chronicle. */
 .goal {
   margin: 2px 0 10px;
-  font-size: 1.08rem;
+  font-size: 1.02rem;
   line-height: 1.4;
 }
 .goal-label {
@@ -632,8 +637,9 @@ b {
   display: flex;
   align-items: baseline;
   min-width: 0;
-  padding: 1px 0;
-  font-size: 0.97rem;
+  padding: 2px 0;
+  font-family: var(--sans);
+  font-size: 0.95rem;
 }
 .ledger-row dt {
   display: flex;
@@ -671,11 +677,13 @@ b {
 }
 .inline-list {
   margin: 0 0 4px;
+  font-family: var(--sans);
+  font-size: 0.95rem;
   color: var(--ink-2);
   line-height: 1.45;
 }
 .il-head {
-  font-style: italic;
+  font-weight: 600;
   color: var(--faded);
 }
 .inline-list.folk b {
@@ -688,24 +696,25 @@ b {
   margin-bottom: 26px;
 }
 .group-head {
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 .group-head h3 {
   margin-bottom: 2px;
-  font-size: 1.2rem;
-  font-style: normal;
+  font-family: var(--serif);
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--ink);
 }
 .group .desc {
   margin: 0;
-  font-style: italic;
+  font-size: 0.95rem;
   color: var(--faded);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .tiles {
   display: grid;
   grid-template-columns: 1fr;
+  gap: 8px;
 }
 .tile {
   position: relative;
@@ -713,38 +722,49 @@ b {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
   min-height: 58px;
-  padding: 11px 6px 12px 8px;
-  border: none;
-  border-bottom: 1px dotted var(--rule-2);
-  border-radius: 0;
-  background: none;
+  padding: 12px 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: 8px;
+  background: var(--leaf);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 .tile:hover:not(:disabled) {
-  background: rgba(230, 217, 188, 0.04);
+  border-color: rgba(196, 154, 69, 0.6);
+  background: var(--leaf-2);
 }
 .tile:active:not(:disabled) {
   background: var(--ochre-wash);
 }
+/* Unavailable: no fill, dashed outline — clearly not a button to press right now. */
 .tile:disabled {
   cursor: default;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--rule);
+  box-shadow: none;
 }
 .tile:disabled .tile-label {
   color: var(--faded);
 }
-/* Done together: a double ochre rule in the margin. */
+/* Done together: an ochre edge. */
 .tile.together {
-  padding-left: 14px;
-  border-left: 3px double var(--ochre);
+  border-left: 4px solid var(--ochre);
+  padding-left: 12px;
 }
 .tile.together:disabled {
-  border-left-color: rgba(196, 154, 69, 0.45);
+  border-left: 4px solid rgba(196, 154, 69, 0.4);
+}
+.tile.running {
+  border-color: var(--ochre);
 }
 .tile.running .tile-label {
   color: var(--ink);
@@ -764,7 +784,7 @@ b {
 }
 .tile-label {
   font-family: var(--serif);
-  font-size: 1.1rem;
+  font-size: 1.04rem;
   font-weight: 600;
   line-height: 1.3;
   color: var(--ink);
@@ -783,9 +803,8 @@ b {
   flex-wrap: wrap;
   gap: 2px 12px;
   font-family: var(--sans);
-  font-size: 0.9rem;
-  line-height: 1.35;
-  font-variant-numeric: lining-nums;
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 .m {
   display: inline-flex;
@@ -814,8 +833,7 @@ b {
   color: var(--pale);
 }
 .tile .reason {
-  font-family: var(--serif);
-  font-size: 0.95rem;
+  font-size: 0.86rem;
 }
 .tile.blocked .reason {
   color: var(--ink-2);
@@ -866,8 +884,8 @@ b {
   border: 1px solid var(--rule-2);
   background: rgba(0, 0, 0, 0.16);
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 17px;
+  font-family: var(--sans);
+  font-size: 16px;
   -webkit-appearance: none;
   appearance: none;
 }
@@ -876,7 +894,6 @@ b {
 }
 .search input::placeholder {
   color: var(--pale);
-  font-style: italic;
 }
 .search input:focus {
   outline: none;
@@ -914,7 +931,9 @@ b {
   border-bottom: 2px solid transparent;
   background: none;
   color: var(--faded);
-  font-size: 1rem;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -969,7 +988,7 @@ b {
   min-width: 0;
 }
 .topic-q {
-  font-size: 1.1rem;
+  font-size: 1.04rem;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -978,7 +997,8 @@ b {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 10px;
-  font-size: 0.95rem;
+  font-family: var(--sans);
+  font-size: 0.86rem;
   color: var(--pale);
 }
 .topic-chev {
@@ -1000,7 +1020,7 @@ b {
 /* how far a question is understood: a word, coloured like a pigment */
 .level {
   flex: none;
-  font-style: italic;
+  font-weight: 600;
   white-space: nowrap;
   color: var(--faded);
 }
@@ -1037,7 +1057,7 @@ b {
   align-items: baseline;
 }
 .clue-head b {
-  font-size: 1.04rem;
+  font-size: 1rem;
 }
 .clue-head .pill.mine .pilcrow {
   display: none;
@@ -1046,7 +1066,8 @@ b {
 .person p {
   margin: 2px 0 0;
   color: var(--ink-2);
-  line-height: 1.55;
+  font-size: 0.97rem;
+  line-height: 1.6;
 }
 mark {
   padding: 0 1px;
@@ -1070,7 +1091,8 @@ mark {
 }
 .log p {
   margin: 0;
-  line-height: 1.5;
+  font-size: 0.97rem;
+  line-height: 1.55;
   color: var(--ink-2);
 }
 .log p.fresh,
@@ -1079,23 +1101,22 @@ mark {
 }
 /* a new day is a rubric */
 .log .log-system {
-  margin: 8px 0 2px;
+  margin: 10px 0 2px;
   color: var(--cinnabar-ink);
-  font-style: italic;
-  font-size: 0.95rem;
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 .log .log-find {
   color: var(--ochre-ink);
-  font-style: italic;
 }
 .log .log-warn {
   color: var(--gall);
 }
 .log .from-partner {
   padding-left: 12px;
-  border-left: 1px solid rgba(142, 165, 179, 0.45);
+  border-left: 2px solid rgba(142, 165, 179, 0.45);
   color: var(--faded);
-  font-style: italic;
 }
 .mini-log {
   margin-top: 6px;
@@ -1128,7 +1149,9 @@ mark {
   border-bottom: 2px solid transparent;
   background: none;
   color: var(--faded);
-  font-size: 1.05rem;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
 }
 .side-switch button.on {
@@ -1167,7 +1190,9 @@ mark {
   border: none;
   background: none;
   color: var(--pale);
-  font-size: 0.92rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1272,7 +1297,8 @@ mark {
   background: var(--leaf-2);
   border: 1px solid var(--cinnabar);
   box-shadow: var(--shadow);
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.92rem;
 }
 
 /* ---------- scene: a page of the chronicle ---------- */
@@ -1337,17 +1363,17 @@ mark {
   opacity: 0.55;
 }
 .block p {
-  font-size: 1.12rem;
-  line-height: 1.68;
+  font-size: 1.06rem;
+  line-height: 1.72;
   margin-bottom: 0.7em;
 }
 /* The scene opens with a cinnabar initial. */
 .block:first-child > p:first-child::first-letter {
   float: left;
   margin: 0.08em 0.1em 0 0;
-  font-size: 3.3em;
+  font-size: 3.1em;
   font-weight: 700;
-  line-height: 0.8;
+  line-height: 0.82;
   color: var(--cinnabar);
 }
 /* What only this player sees: a gloss in the margin of the page. */
@@ -1359,7 +1385,7 @@ mark {
 .own p {
   font-style: italic;
   color: #e8d3a4;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 .own p:last-child {
   margin-bottom: 0;
@@ -1368,13 +1394,15 @@ mark {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-bottom: 2px;
-  font-style: italic;
-  font-size: 0.92rem;
+  margin-bottom: 4px;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--cinnabar-ink);
 }
 .picks {
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.9rem;
   color: var(--gall);
   margin-top: 6px;
 }
@@ -1399,7 +1427,7 @@ mark {
   font-size: 1.12rem;
 }
 .combat-row .small {
-  font-style: italic;
+  font-family: var(--sans);
   color: var(--ink-2);
 }
 .bar {
@@ -1438,6 +1466,7 @@ mark {
 .options {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 .opt {
   display: flex;
@@ -1445,24 +1474,23 @@ mark {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 56px;
-  padding: 10px 6px;
-  border: none;
-  border-bottom: 1px dotted var(--rule-2);
-  background: none;
+  min-height: 54px;
+  padding: 11px 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: 8px;
+  background: var(--leaf-2);
   color: var(--ink);
   text-align: left;
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
-}
-.opt:last-child {
-  border-bottom: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 .opt:hover:not(:disabled) {
-  background: rgba(230, 217, 188, 0.04);
+  border-color: rgba(196, 154, 69, 0.6);
 }
 .opt:active:not(:disabled) {
   background: var(--ochre-wash);
@@ -1476,6 +1504,8 @@ mark {
 }
 .opt.on {
   opacity: 1;
+  border-color: var(--ochre);
+  background: var(--ochre-wash);
   color: var(--ochre-ink);
 }
 .opt.on > .ico {
@@ -1495,7 +1525,8 @@ mark {
   gap: 6px;
   margin: 0 0 4px;
   color: var(--gall);
-  font-style: italic;
+  font-family: var(--sans);
+  font-size: 0.9rem;
 }
 .waiting {
   margin: 6px 0;
@@ -1545,8 +1576,7 @@ mark {
   border: 1px solid var(--rule-2);
   box-shadow: var(--shadow);
   font-family: var(--sans);
-  font-size: 1.05rem;
-  font-variant-numeric: lining-nums;
+  font-size: 1rem;
   animation: delta-life 4.2s ease both;
 }
 /* the echo of a change */
@@ -1577,8 +1607,7 @@ mark {
 }
 .delta .who {
   color: var(--gall);
-  font-family: var(--serif);
-  font-style: italic;
+  font-weight: 600;
 }
 .delta .item {
   white-space: nowrap;
@@ -1644,7 +1673,7 @@ mark {
   }
   .tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 28px;
+    gap: 10px;
   }
   .ledger {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1727,7 +1756,7 @@ mark {
   }
   .tiles {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    column-gap: 28px;
+    gap: 10px;
   }
   .proposal,
   .scene-mini {
@@ -1770,8 +1799,8 @@ mark {
     margin: 4px 0 0;
   }
   .own p {
-    font-size: 0.98rem;
-    line-height: 1.55;
+    font-size: 0.95rem;
+    line-height: 1.6;
   }
   .scene-foot {
     padding: 14px 36px 20px;
