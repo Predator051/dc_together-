@@ -5,6 +5,7 @@ export const ui: Record<string, string> = {
   goal_prefix: 'Мета:',
   new_clue: 'Новий запис у щоденнику:',
   new_day: 'Ніч минула. Настав день',
+  daily_work: 'Громада за день принесла:',
 
   err_in_scene: 'Спершу доведіть до кінця спільну справу.',
   err_not_now: 'Зараз не вийде.',

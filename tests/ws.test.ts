@@ -251,17 +251,17 @@ describe('synchronisation', () => {
 });
 
 describe('two bot clients over WebSocket', () => {
-  it('play acts 1–2 to the end', async () => {
+  it('play acts 1–3 to the end', async () => {
     await boot();
     const [a, b] = await pair();
     const cs: Record<PlayerId, TestClient> = { p1: a, p2: b };
     const bots: Record<PlayerId, Bot> = {
-      p1: new Bot('A', content, { choice: 'random', combat: 'smart', seed: 31 }),
-      p2: new Bot('B', content, { choice: 'random', combat: 'smart', seed: 32 }),
+      p1: new Bot('A', content, { choice: 'first', combat: 'smart', seed: 1 }),
+      p2: new Bot('B', content, { choice: 'first', combat: 'smart', seed: 2 }),
     };
     let steps = 0;
-    const finished = () => !!running!.game.state.flags['a2_done'] && !running!.game.state.scene;
-    while (!finished() && steps < 12000) {
+    const finished = () => !!running!.game.state.flags['a3_done'] && !running!.game.state.scene;
+    while (!finished() && steps < 40000) {
       steps++;
       let acted = false;
       for (const pid of (steps % 2 ? ['p1', 'p2'] : ['p2', 'p1']) as PlayerId[]) {
@@ -285,8 +285,8 @@ describe('two bot clients over WebSocket', () => {
     if (!finished()) console.log('WS autoplay stopped', steps, JSON.stringify(running!.game.state.flags), JSON.stringify(a.view?.groups.map((g) => g.entries.map((e) => `${e.id}:${e.enabled}:${e.reason ?? ''}`))));
     expect(finished()).toBe(true);
     await settle(a, b);
-    expect(a.view!.actDone?.act).toBe(2);
-    expect(b.view!.actDone?.act).toBe(2);
+    expect(a.view!.actDone?.act).toBe(3);
+    expect(b.view!.actDone?.act).toBe(3);
   });
 });
 

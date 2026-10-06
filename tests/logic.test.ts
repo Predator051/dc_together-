@@ -327,6 +327,50 @@ describe('end-of-act banner', () => {
     w.state.flags['a1_done'] = 1;
     expect(w.view('p1').actDone).toBeNull();
     w.state.meta.actDone = 2;
-    expect(w.view('p1').actDone?.act).toBe(2);
+    expect(w.view('p1').actDone).toBeNull();
+    w.state.meta.actDone = 3;
+    expect(w.view('p1').actDone?.act).toBe(3);
+  });
+});
+
+describe('act 3 systems', () => {
+  it('rescued villagers are treated, put to work and bring resources every day; alarm cools down', () => {
+    const w = ready();
+    w.state.flags['rescued'] = 3;
+    w.state.flags['a3_recipe'] = 1;
+    w.state.flags['alarm'] = 2;
+    w.state.res['res_30'] = 3;
+    w.state.res['res_35'] = 2;
+    w.state.res['res_01'] = 0;
+    expect(w.cmd('p1', { c: 'act', id: 'act_71' }).ok).toBe(true);
+    expect(w.state.res['res_30']).toBe(2);
+    expect(w.state.res['res_31']).toBe(1);
+    expect(w.state.flags['recovered']).toBe(1);
+    w.advance(6000);
+    expect(w.cmd('p1', { c: 'act', id: 'act_72' }).ok).toBe(true);
+    expect(w.state.res['res_32']).toBe(1);
+    // A new day: the woodcutter brings 2 logs, alarm drops by one.
+    w.state.flags['built:act_01'] = 1;
+    w.g().startScene('scn_25');
+    w.cmd('p1', { c: 'next' });
+    w.cmd('p2', { c: 'next' });
+    expect(w.state.res['res_01']).toBe(2);
+    expect(w.state.flags['alarm']).toBe(1);
+    expect(w.view('p1').log.some((l) => l.text.startsWith('Громада за день принесла'))).toBe(true);
+  });
+
+  it('forays are locked while the Order is on alert', () => {
+    const w = ready();
+    for (const f of ['a2_done', 'done:scn_60', 'done:scn_61']) w.state.flags[f] = 1;
+    w.state.players.p1.at = 'kruchi';
+    w.state.players.p2.at = 'kruchi';
+    w.state.res['res_38'] = 4;
+    w.state.res['res_08'] = 2;
+    w.state.flags['alarm'] = 3;
+    const cells = () => w.view('p1').groups.flatMap((g) => g.entries).find((e) => e.id === 'scn_62')!;
+    expect(cells().enabled).toBe(false);
+    expect(cells().reason).toContain('насторожі');
+    w.state.flags['alarm'] = 2;
+    expect(cells().enabled).toBe(true);
   });
 });

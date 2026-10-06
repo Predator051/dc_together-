@@ -538,6 +538,9 @@ p {
 .chip.full b {
   color: var(--ember2);
 }
+.chip.folk b {
+  color: var(--ok);
+}
 .chip.tool {
   color: var(--own);
 }

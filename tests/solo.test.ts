@@ -39,7 +39,7 @@ describe('solo play: one player offline', () => {
     expect(hatch?.enabled).toBe(false);
   });
 
-  for (const [pid, stage] of [['p1', 'done:scn_10'], ['p2', 'done:scn_10'], ['p1', 'done:scn_44'], ['p2', 'done:scn_44']] as const) {
+  for (const [pid, stage] of [['p1', 'done:scn_10'], ['p2', 'done:scn_10'], ['p1', 'done:scn_44'], ['p2', 'done:scn_44'], ['p1', 'done:scn_64'], ['p2', 'done:scn_64']] as const) {
     it(`routine by ${pid} alone never advances the story (after ${stage})`, () => {
       // Play together until the middle of the act, then one player leaves.
       const r = autoplay(

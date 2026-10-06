@@ -41,6 +41,7 @@ export const T = {
   tabLog: 'Журнал',
   stock: 'Комора',
   items: 'Речі',
+  folk: 'Громада',
   partner: 'Поруч',
   partnerNone: 'Друге місце ще вільне',
   partnerOffline: 'не в мережі',

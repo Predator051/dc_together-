@@ -139,7 +139,8 @@ function Group({ g, c }: { g: GroupView; c: Ctx }) {
 function Stock({ v }: { v: PlayerView }) {
   const res = v.res.filter((r) => r.kind === 'res');
   const tools = v.res.filter((r) => r.kind === 'tool' && r.n > 0);
-  if (res.length === 0 && tools.length === 0) return null;
+  const folk = v.res.filter((r) => r.kind === 'people' && r.n > 0);
+  if (res.length === 0 && tools.length === 0 && folk.length === 0) return null;
   return (
     <section class="card stock">
       {res.length > 0 && (
@@ -153,6 +154,19 @@ function Stock({ v }: { v: PlayerView }) {
                   {r.n}
                   {r.cap !== undefined && <small>/{r.cap}</small>}
                 </b>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {folk.length > 0 && (
+        <>
+          <h3>{T.folk}</h3>
+          <div class="chips">
+            {folk.map((r) => (
+              <span class="chip folk">
+                <span>{r.name}</span>
+                <b>{r.n}</b>
               </span>
             ))}
           </div>

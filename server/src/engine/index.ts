@@ -401,6 +401,7 @@ export class Game {
       const text: Partial<Record<PlayerId, string>> = {};
       for (const pid of this.joinedIds()) text[pid] = `${this.ix.ui('new_day')} ${this.s.meta.day}.`;
       this.logRaw('system', text);
+      this.applyDaily();
       return;
     }
     if ('heal' in e) {
@@ -429,6 +430,27 @@ export class Game {
       for (const pid of this.targets(e.who ?? 'actor', actor)) this.p(pid).at = e.moveTo;
       this.s.proposal = null;
       return;
+    }
+  }
+
+  /** Daily rules: work of the community, cooling of alarms, etc. */
+  private applyDaily(): void {
+    const gained: Record<string, number> = {};
+    for (const d of this.ix.c.daily ?? []) {
+      if (d.if && !this.test(d.if)) continue;
+      const amount = d.add * (d.per ? (this.s.res[d.per] ?? 0) : 1);
+      if (!amount) continue;
+      if (d.res) {
+        const got = this.addRes(d.res, amount);
+        if (got > 0) gained[d.res] = (gained[d.res] ?? 0) + got;
+      }
+      if (d.flag) this.s.flags[d.flag] = Math.max(d.min ?? 0, this.flag(d.flag) + amount);
+    }
+    const parts = Object.entries(gained).map(([r, n]) => `${this.ix.res.get(r)?.name ?? r} +${n}`);
+    if (parts.length) {
+      const text: Partial<Record<PlayerId, string>> = {};
+      for (const pid of this.joinedIds()) text[pid] = `${this.ix.ui('daily_work')} ${parts.join(', ')}.`;
+      this.logRaw('system', text);
     }
   }
 
@@ -498,7 +520,7 @@ export class Game {
       }
     }
     // Main log (or a one-time vignette) first, chance logs after it.
-    const mainAt = this.s.log.length;
+    const mainId = this.s.meta.nextLogId;
     const beatIdx = (a.beats ?? []).findIndex((b, i) => !this.flag(`beat:${a.id}:${i}`) && (!b.if || this.test(b.if, pid)));
     if (beatIdx >= 0) {
       const beat = a.beats![beatIdx]!;
@@ -519,7 +541,7 @@ export class Game {
       }
     }
     this.apply(a.effects, pid);
-    this.logGains(pid, gained, mainAt);
+    this.logGains(pid, gained, mainId);
 
     if (a.once) this.s.flags[`built:${a.id}`] = 1;
     if (a.oncePerPlayer) p.flags[`built:${a.id}`] = 1;
@@ -530,7 +552,7 @@ export class Game {
   }
 
   /** Append "Дрова +2" to the actor's line of this action (or log it separately). */
-  private logGains(pid: PlayerId, gained: Record<string, number>, mainAt: number): void {
+  private logGains(pid: PlayerId, gained: Record<string, number>, mainId: number): void {
     const parts: string[] = [];
     for (const [r, n] of Object.entries(gained)) {
       if (n <= 0) continue;
@@ -539,7 +561,8 @@ export class Game {
       parts.push(`${def.name} +${n}`);
     }
     if (!parts.length) return;
-    const main = this.s.log[mainAt];
+    // Find by id: the log is trimmed from the front, so indexes shift.
+    const main = this.s.log.find((e) => e.id === mainId);
     if (main && main.actor === pid && main.text[pid]) main.text[pid] = `${main.text[pid]} (${parts.join(', ')})`;
     else this.logRaw('system', { [pid]: parts.join(' · ') }, pid);
   }

@@ -197,6 +197,14 @@ export function validateContent(c: Content): Report {
     }
   };
 
+  // Daily rules
+  for (const d of c.daily ?? []) {
+    if (d.res && !res.has(d.res)) err(`daily: unknown resource ${d.res}`);
+    if (d.per && !res.has(d.per)) err(`daily: unknown resource ${d.per}`);
+    if (!d.res && !d.flag) err('daily: needs res or flag');
+    checkCond('daily', d.if);
+  }
+
   // Resources
   for (const r of c.resources) for (const b of r.capBonus ?? []) checkCond(`resource ${r.id}`, b.if);
   for (const [k] of Object.entries(c.start.resources)) if (!res.has(k)) err(`start: unknown resource ${k}`);
@@ -358,7 +366,7 @@ function simulate(c: Content) {
     if ('all' in cond) return cond.all.every(ok);
     if ('any' in cond) return cond.any.some(ok);
     if ('not' in cond) return true;
-    if ('flag' in cond) return flags.has(cond.flag);
+    if ('flag' in cond) return (cond.lt !== undefined && cond.gte === undefined) || flags.has(cond.flag);
     if ('pflag' in cond) return pflags.has(cond.pflag);
     if ('partnerPflag' in cond) return pflags.has(cond.partnerPflag);
     if ('res' in cond) return cond.gte === undefined || cond.gte <= 0 || have.has(cond.res);

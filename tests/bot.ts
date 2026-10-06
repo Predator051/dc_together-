@@ -23,6 +23,10 @@ const COMBAT_ORDER = ['bell', 'bow', 'torch', 'axe', 'knife', 'shout', 'guard', 
 export class Bot {
   readonly rng: Rng;
   private actions: Map<string, ActionDef>;
+  /** Travel action id -> destination area. */
+  private travelTo = new Map<string, string>();
+  /** Resource -> areas where some action produces it. */
+  private madeIn = new Map<string, Set<string>>();
   /** Scene id -> world signature when it was last proposed (avoid pointless repeats). */
   private tried = new Map<string, string>();
   /** How many times the bot stood at each choice node. */
@@ -35,6 +39,15 @@ export class Bot {
   ) {
     this.rng = new Rng(o.seed);
     this.actions = new Map(content.actions.map((a) => [a.id, a]));
+    for (const a of content.actions) for (const e of a.effects ?? []) if ('moveTo' in e) this.travelTo.set(a.id, e.moveTo);
+    const areaOf = (group: string) => content.locations.find((l) => l.id === group)?.area ?? content.areas[0]!.id;
+    for (const a of content.actions) {
+      const made = [...Object.keys(a.yield ?? {}), ...(a.chance ?? []).flatMap((c) => Object.keys(c.add ?? {}))];
+      for (const r of made) {
+        if (!this.madeIn.has(r)) this.madeIn.set(r, new Set());
+        this.madeIn.get(r)!.add(areaOf(a.group));
+      }
+    }
   }
 
   private pick<T>(items: T[]): T | undefined {
@@ -88,12 +101,38 @@ export class Bot {
 
     if (v.busyUntil > now) return null;
     // Travel: stay with the partner; otherwise sometimes go where there may be work.
-    const travel = entries.find((e) => e.kind === 'act' && e.enabled && (e.id === 'act_40' || e.id === 'act_41'));
-    if (travel && !(travel.readyAt && travel.readyAt > now)) {
+    const travels = entries.filter((e) => e.kind === 'act' && e.enabled && this.travelTo.has(e.id) && !(e.readyAt && e.readyAt > now));
+    if (travels.length) {
       const apart = v.partner.joined && v.partner.area !== v.me.area;
-      const storyHere = entries.some((e) => e.kind === 'scene' && (e.enabled || e.reason === undefined || (e.cost?.some((c) => !c.ok) ?? false)));
-      if (apart && this.rng.chance(storyHere ? 0.15 : 0.6)) return { c: 'act', id: travel.id };
-      if (!apart && this.rng.chance(0.015)) return { c: 'act', id: travel.id };
+      if (apart) {
+        const order = this.content.areas.map((a) => a.id);
+        const dir = Math.sign(order.indexOf(v.partner.area) - order.indexOf(v.me.area));
+        const toward = travels.find((e) => Math.sign(order.indexOf(this.travelTo.get(e.id)!) - order.indexOf(v.me.area)) === dir);
+        const storyHere = entries.some((e) => e.kind === 'scene');
+        if (toward && this.rng.chance(storyHere ? 0.15 : 0.6)) return { c: 'act', id: toward.id };
+      } else {
+        // Go where a missing resource can be produced, if it can't be made here.
+        const wantedHere = this.wanted(v, entries);
+        const madeHere = new Set<string>();
+        for (const e of entries) {
+          const a = this.actions.get(e.id);
+          if (!a) continue;
+          for (const r of Object.keys(a.yield ?? {})) madeHere.add(r);
+          for (const ch of a.chance ?? []) for (const r of Object.keys(ch.add ?? {})) madeHere.add(r);
+        }
+        const missing = [...wantedHere.keys()].filter((r) => !madeHere.has(r) && this.madeIn.has(r));
+        if (missing.length && this.rng.chance(0.2)) {
+          const order = this.content.areas.map((a) => a.id);
+          const target = [...(this.madeIn.get(this.rng.pick(missing)) ?? [])].filter((a) => a !== v.me.area);
+          if (target.length) {
+            const goal = this.rng.pick(target);
+            const dir = Math.sign(order.indexOf(goal) - order.indexOf(v.me.area));
+            const toward = travels.find((e) => Math.sign(order.indexOf(this.travelTo.get(e.id)!) - order.indexOf(v.me.area)) === dir);
+            if (toward) return { c: 'act', id: toward.id };
+          }
+        }
+        if (this.rng.chance(0.01)) return { c: 'act', id: this.rng.pick(travels).id };
+      }
     }
     const wanted = this.wanted(v, entries);
     const ready = entries.filter((e) => e.kind === 'act' && e.enabled && !(e.readyAt && e.readyAt > now));
@@ -163,7 +202,7 @@ export class Bot {
       if (need && have - n < need) s -= 15;
     }
     if (a.id === 'act_02' && v.stove.state === 'warm') s -= 50;
-    if (a.id === 'act_40' || a.id === 'act_41') return 0;
+    if (this.travelTo.has(a.id)) return 0;
     if (a.id === 'act_p5') s -= 40;
     if (a.id === 'act_09') s -= 5;
     return s;

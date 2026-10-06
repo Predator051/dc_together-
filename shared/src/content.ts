@@ -90,7 +90,7 @@ export interface ResourceDef {
   capBonus?: Array<{ if: Cond; add: number }>;
   /** Hidden counters are never shown to players (reservoirs, internal stock). */
   hidden?: boolean;
-  kind?: 'res' | 'tool';
+  kind?: 'res' | 'tool' | 'people';
   desc?: Text;
   order: number;
 }
@@ -315,6 +315,19 @@ export interface NpcDef {
   desc: Text;
 }
 
+/**
+ * Daily change: add `add` (× the amount of resource `per`, if given) to a resource or a flag.
+ * Flags never go below `min` (default 0).
+ */
+export interface DailyDef {
+  res?: string;
+  flag?: string;
+  add: number;
+  per?: string;
+  min?: number;
+  if?: Cond;
+}
+
 export interface StoveDef {
   /** Burn time of one log, ms. */
   perWood: number;
@@ -336,6 +349,8 @@ export interface Content {
   goals: GoalDef[];
   npcs: NpcDef[];
   stove: StoveDef;
+  /** Applied every time a new day starts (after a supper). */
+  daily?: DailyDef[];
   start: {
     resources: Record<string, number>;
     hp: number;

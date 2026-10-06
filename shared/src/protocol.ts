@@ -160,7 +160,7 @@ export interface ResView {
   name: string;
   n: number;
   cap?: number;
-  kind: 'res' | 'tool';
+  kind: 'res' | 'tool' | 'people';
 }
 
 export interface LogView {
