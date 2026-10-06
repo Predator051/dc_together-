@@ -23,8 +23,8 @@ describe('visual ambience', () => {
     w.advance(5000);
     expect(w.cmd('p1', { c: 'act', id: 'act_p4' }).ok).toBe(true);
     // Lighting the candle shows its accent to the one doing it and, nearby, to the partner.
-    expect(w.view('p1').ambient.fx).toBe('sparks');
-    expect(w.view('p2').ambient.partnerFx).toBe('sparks');
+    expect(w.view('p1').ambient.fx).toBe('flint');
+    expect(w.view('p2').ambient.partnerFx).toBe('flint');
     // the end time lets the client stop the accent on time
     expect(w.view('p1').ambient.fxUntil).toBe(w.view('p1').busyUntil);
     expect(w.view('p2').ambient.partnerFxUntil).toBe(w.view('p1').busyUntil);
@@ -39,9 +39,14 @@ describe('visual ambience', () => {
     w.online('p1');
     w.online('p2');
     w.cmd('p1', { c: 'act', id: 'act_p1' });
-    expect(w.view('p2').ambient.partnerFx).toBeNull(); // act_p1 has no accent
+    expect(w.view('p2').ambient.partnerFx).toBe('breath');
     w.online('p1', false);
     expect(w.view('p2').ambient.partnerFx).toBeNull();
+  });
+
+  it('every action has its own sound', () => {
+    const missing = content.actions.filter((a) => !content.ambient!.actions[a.id]).map((a) => a.id);
+    expect(missing).toEqual([]);
   });
 
   it('the validator catches unknown actions and areas in the ambience', () => {
