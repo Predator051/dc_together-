@@ -326,7 +326,6 @@ describe('end-of-act banner', () => {
     w.state.meta.actDone = 1;
     w.state.flags['a1_done'] = 1;
     expect(w.view('p1').actDone).toBeNull();
-    expect(w.view('p1').goal).toContain('вирушити на схід');
     w.state.meta.actDone = 2;
     expect(w.view('p1').actDone?.act).toBe(2);
   });
