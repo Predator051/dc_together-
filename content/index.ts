@@ -24,6 +24,7 @@ import { resources3 } from './act3/resources.js';
 import { hallScenes } from './act3/scenes/halls.js';
 import { homeScenes3 } from './act3/scenes/home.js';
 import { supperScenes3 } from './act3/scenes/supper.js';
+import { ambient } from './ambient.js';
 import { ui } from './ui.js';
 
 export const content: Content = {
@@ -44,6 +45,7 @@ export const content: Content = {
   goals: [...goals3, ...goals2, ...goals],
   npcs: [...npcs, ...npcs2, ...npcs3],
   stove: { perWood: 4 * 60 * 1000, maxWood: 6, coldPenalty: 1.5, low: 3 * 60 * 1000 },
+  ambient,
   start: { resources: startResources, hp: 10 },
   daily: [
     { res: 'res_01', per: 'res_32', add: 2 },

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EntryView, GroupView, PlayerView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
+import { Ambient } from './ambient.js';
 import { Notes, useSeenClues } from './notes.js';
 import { Scene } from './scene.js';
 import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconWork } from './icons.js';
@@ -347,6 +348,7 @@ export function Game({ s }: { s: NetState }) {
 
   return (
     <div class="game">
+      <Ambient a={v.ambient} paused={!!v.scene} />
       <header class="top">
         <span class="brand">{T.title}</span>
         <div class="top-info">

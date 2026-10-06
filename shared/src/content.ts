@@ -336,6 +336,23 @@ export interface StoveDef {
   low: number;
 }
 
+/** Backdrop of the place a player is in. */
+export type AmbientKind = 'cellar' | 'candle' | 'snow' | 'river' | 'cave';
+/** Short visual accent while an action runs. */
+export type FxKind = 'fire' | 'sparks' | 'chop' | 'water' | 'steam' | 'walk' | 'arrow' | 'shavings' | 'dust';
+
+/** Purely visual ambience: never affects rules. */
+export interface AmbientDef {
+  /** Backdrop per area id. */
+  areas: Record<string, AmbientKind>;
+  /** Checked in order before `areas` (e.g. the prologue cellar). */
+  overrides?: Array<{ when: Cond; kind: AmbientKind }>;
+  /** A fire burns in this area (besides the home stove) while the condition holds. */
+  fires?: Record<string, Cond>;
+  /** Action id → accent shown while it runs. */
+  actions: Record<string, FxKind>;
+}
+
 export interface Content {
   areas: AreaDef[];
   resources: ResourceDef[];
@@ -349,6 +366,7 @@ export interface Content {
   goals: GoalDef[];
   npcs: NpcDef[];
   stove: StoveDef;
+  ambient?: AmbientDef;
   /** Applied every time a new day starts (after a supper). */
   daily?: DailyDef[];
   start: {

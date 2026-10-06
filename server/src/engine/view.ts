@@ -287,6 +287,27 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
   // The stove is in Ясенець: elsewhere its state is not shown.
   const stoveText = stoveState === 'never' || me.at !== g.ix.homeArea ? '' : ui(`stove_${stoveState}`);
 
+  const amb = g.ix.c.ambient;
+  const here = me.at;
+  let ambKind = (amb?.areas[here] ?? 'snow') as PlayerView['ambient']['kind'];
+  for (const o2 of amb?.overrides ?? [])
+    if (g.test(o2.when, pid)) {
+      ambKind = o2.kind;
+      break;
+    }
+  let fire: PlayerView['ambient']['fire'] = 'none';
+  if (here === g.ix.homeArea) fire = stoveState === 'never' ? 'none' : stoveState;
+  else if (amb?.fires?.[here] && g.test(amb.fires[here]!, pid)) fire = 'warm';
+  if (ambKind === 'cellar' || ambKind === 'candle') fire = 'none';
+  const fxOf = (pl: typeof me) =>
+    pl.busy && pl.busy.until > g.now ? (amb?.actions[pl.busy.action] ?? null) : null;
+  const ambient: PlayerView['ambient'] = {
+    kind: ambKind,
+    fire,
+    fx: fxOf(me),
+    partnerFx: o.joined && o.online && o.at === here ? fxOf(o) : null,
+  };
+
   let partnerBusy: { text: string; from: number; until: number } | null = null;
   if (o.busy && o.busy.until > g.now) {
     const a = g.ix.actions.get(o.busy.action);
@@ -379,6 +400,7 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
     act: g.s.meta.act,
     goal: goalDef ? g.render(goalDef.text, pid) : null,
     stove: { state: stoveState, text: stoveText },
+    ambient,
     status: [],
     res,
     groups: groups(g, pid),

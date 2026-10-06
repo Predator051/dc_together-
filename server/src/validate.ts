@@ -341,6 +341,16 @@ export function validateContent(c: Content): Report {
     cs.forEach((x) => checkCond(`npc ${n.id}`, x));
   }
 
+  // Ambience (visual only)
+  if (c.ambient) {
+    const actionIds = new Set(c.actions.map((a) => a.id));
+    for (const k of Object.keys(c.ambient.areas)) if (!areas.has(k)) err(`ambient: unknown area ${k}`);
+    for (const k of Object.keys(c.ambient.fires ?? {})) if (!areas.has(k)) err(`ambient fires: unknown area ${k}`);
+    for (const [k, cond] of Object.entries(c.ambient.fires ?? {})) checkCond(`ambient fire ${k}`, cond);
+    (c.ambient.overrides ?? []).forEach((o, i) => checkCond(`ambient override ${i}`, o.when));
+    for (const k of Object.keys(c.ambient.actions)) if (!actionIds.has(k)) err(`ambient: unknown action ${k}`);
+  }
+
   const reachable = simulate(c);
   for (const s of c.scenes) if (!reachable.scenes.has(s.id)) err(`scene ${s.id} is unreachable`);
   for (const a of c.actions) if (!reachable.actions.has(a.id)) err(`action ${a.id} is unreachable`);

@@ -1,4 +1,4 @@
-import type { Gender, PlayerId, Role, LogKind } from './content.js';
+import type { AmbientKind, FxKind, Gender, PlayerId, Role, LogKind } from './content.js';
 
 // ---------- Client -> server ----------
 
@@ -203,6 +203,15 @@ export interface PersonView {
   desc: string;
 }
 
+export interface AmbientView {
+  kind: AmbientKind;
+  fire: 'none' | 'warm' | 'low' | 'cold';
+  /** Accent of this player's running action. */
+  fx: FxKind | null;
+  /** Accent of the partner's running action, only when the partner is here and online. */
+  partnerFx: FxKind | null;
+}
+
 export interface PlayerView {
   now: number;
   me: MeView;
@@ -211,6 +220,8 @@ export interface PlayerView {
   act: number;
   goal: string | null;
   stove: { state: 'never' | 'warm' | 'low' | 'cold'; text: string } ;
+  /** Purely visual backdrop: weather of this place, its fire, running action accents. */
+  ambient: AmbientView;
   status: string[];
   res: ResView[];
   groups: GroupView[];
