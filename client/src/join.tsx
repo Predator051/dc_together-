@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { Role } from '../../shared/src/content.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
+import { IconFlame } from './icons.js';
 import { T } from './strings.js';
 
 export function Join({ s }: { s: NetState }) {
@@ -28,8 +29,9 @@ export function Join({ s }: { s: NetState }) {
   return (
     <div class="join">
       <div class="join-card">
+        <IconFlame class="logo-mark" />
         <h1 class="logo">{T.title}</h1>
-        <p class="muted center">{T.subtitle}</p>
+        <p class="subtitle">{T.subtitle}</p>
 
         {!lobby && (
           <form onSubmit={submitCode} class="stack">

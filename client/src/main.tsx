@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { Game } from './game.js';
 import { Join } from './join.js';
 import { net, type NetState } from './net.js';
+import { IconFlame } from './icons.js';
 import { T } from './strings.js';
 import './styles.css';
 
@@ -16,6 +17,7 @@ function App() {
   return (
     <div class="join">
       <div class="join-card">
+        <IconFlame class="logo-mark" />
         <h1 class="logo">{T.title}</h1>
         <p class="muted center">{s.connected ? T.loading : T.reconnecting}</p>
       </div>

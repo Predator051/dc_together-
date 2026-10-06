@@ -1,8 +1,10 @@
+import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { EntryView, GroupView, PlayerView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
 import { Scene } from './scene.js';
+import { IconFlame, IconLock, IconLog, IconNotes, IconPair, IconPin, IconSnow, IconTarget, IconWork, IconEye } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -85,49 +87,66 @@ function Entry({ e, c }: { e: EntryView; c: Ctx }) {
   const reason = e.enabled ? (recharge ? secsLeft(recharge, now) : null) : e.reason;
   const gains = e.gain ?? [];
   const costs = e.cost ?? [];
+  const meta = gains.length > 0 || costs.length > 0 || !!reason || !!e.hint;
 
   return (
-    <div class={`entry ${e.together ? 'together' : ''}`}>
-      <button
-        class={`btn act ${mine ? 'running' : ''}`}
-        disabled={disabled}
-        onClick={() => net.send({ c: 'act', id: e.id })}
-      >
-        {mine && <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={c.offset} cls="fill" />}
-        <span class="label">{e.label}</span>
-        {mine ? <span class="secs">{secsLeft(v.busyUntil, now)}</span> : e.together && <span class="tag">{T.together}</span>}
-      </button>
-      {(gains.length > 0 || costs.length > 0 || reason || e.hint) && (
-        <div class="entry-meta">
+    <button
+      class={`tile ${e.together ? 'together' : ''} ${mine ? 'running' : ''} ${!e.enabled ? 'blocked' : ''}`}
+      disabled={disabled}
+      onClick={() => net.send({ c: 'act', id: e.id })}
+    >
+      {mine && <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={c.offset} cls="tile-fill" />}
+      <span class="tile-top">
+        <span class="tile-label">{e.label}</span>
+        {mine ? (
+          <span class="tile-secs">{secsLeft(v.busyUntil, now)}</span>
+        ) : (
+          e.together && (
+            <span class="pill pair">
+              <IconPair />
+              {T.together}
+            </span>
+          )
+        )}
+      </span>
+      {meta && (
+        <span class="tile-meta">
           {gains.map((x) => (
-            <span class={`gain ${x.unsure ? 'unsure' : ''}`}>{x.text}</span>
+            <span class={`m gain ${x.unsure ? 'unsure' : ''}`}>{x.text}</span>
           ))}
           {costs.map((c) =>
             c.stock ? (
-              <span class="stock-left">
+              <span class="m stock-left">
                 {c.name}: {c.have}
               </span>
             ) : (
-              <span class={`cost ${c.ok ? '' : 'short'}`}>
+              <span class={`m cost ${c.ok ? '' : 'short'}`}>
                 −{c.n} {c.name}
                 {!c.ok && ` (${T.have} ${c.have})`}
               </span>
             ),
           )}
-          {reason && <span class="reason">{reason}</span>}
-          {!reason && e.hint && <span class="hint">{e.hint}</span>}
-        </div>
+          {reason && (
+            <span class="m reason">
+              {!e.enabled && <IconLock />}
+              {reason}
+            </span>
+          )}
+          {!reason && e.hint && <span class="m hint">{e.hint}</span>}
+        </span>
       )}
-    </div>
+    </button>
   );
 }
 
 function Group({ g, c }: { g: GroupView; c: Ctx }) {
   return (
-    <section class={`card group ${g.base ? 'base' : ''}`}>
-      <h3>{g.name}</h3>
-      {g.desc && <p class="desc">{g.desc}</p>}
-      <div class="entries">
+    <section class={`group ${g.base ? 'base' : ''}`}>
+      <header class="group-head">
+        <h3>{g.name}</h3>
+        {g.desc && <p class="desc">{g.desc}</p>}
+      </header>
+      <div class="tiles">
         {g.entries.map((e) => (
           <Entry key={e.id} e={e} c={c} />
         ))}
@@ -142,20 +161,29 @@ function Stock({ v }: { v: PlayerView }) {
   const folk = v.res.filter((r) => r.kind === 'people' && r.n > 0);
   if (res.length === 0 && tools.length === 0 && folk.length === 0) return null;
   return (
-    <section class="card stock">
+    <section class="panel stock">
       {res.length > 0 && (
         <>
           <h3>{T.stock}</h3>
-          <div class="chips">
-            {res.map((r) => (
-              <span class={`chip ${r.cap !== undefined && r.n >= r.cap ? 'full' : ''}`}>
-                <span>{r.name}</span>
-                <b>
-                  {r.n}
-                  {r.cap !== undefined && <small>/{r.cap}</small>}
-                </b>
-              </span>
-            ))}
+          <div class="res-grid">
+            {res.map((r) => {
+              const full = r.cap !== undefined && r.n >= r.cap;
+              const pct = r.cap ? Math.min(100, (r.n / r.cap) * 100) : 0;
+              return (
+                <div class={`res ${full ? 'full' : ''} ${r.n === 0 ? 'empty' : ''}`}>
+                  <span class="res-name">{r.name}</span>
+                  <span class="res-n">
+                    {r.n}
+                    {r.cap !== undefined && <small>/{r.cap}</small>}
+                  </span>
+                  {r.cap !== undefined && (
+                    <span class="res-bar" aria-hidden="true">
+                      <span style={{ width: `${pct}%` }} />
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
@@ -188,64 +216,94 @@ function Stock({ v }: { v: PlayerView }) {
 
 function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: number }) {
   const p = v.partner;
-  if (!p.joined) return <div class="partner muted">{T.partnerNone}</div>;
+  if (!p.joined)
+    return (
+      <div class="mate off">
+        <span class="avatar">?</span>
+        <span class="mate-status muted">{T.partnerNone}</span>
+      </div>
+    );
   const working = p.online && p.busy && p.busy.until > now ? p.busy : null;
   const status = !p.online ? T.partnerOffline : working ? working.text : T.partnerIdle;
   return (
-    <div class={`partner ${p.online ? 'on' : 'off'}`}>
-      <span class="dot" />
-      <b>{p.name}</b>
-      <span class="muted">{p.roleTitle ? ` · ${p.roleTitle}` : ''}</span>
-      {p.area !== v.me.area && <span class="where-other">{p.where}</span>}
-      <span class="status">{status}</span>
-      {working && (
-        <span class="mini-bar" aria-hidden="true">
-          <Fill key={working.until} from={working.from} until={working.until} offset={offset} cls="" />
+    <div class={`mate ${p.online ? 'on' : 'off'}`}>
+      <span class="avatar">{p.name.slice(0, 1).toUpperCase()}</span>
+      <span class="mate-body">
+        <span class="mate-line">
+          <b>{p.name}</b>
+          {p.area !== v.me.area && (
+            <span class="mate-where">
+              <IconPin />
+              {p.where}
+            </span>
+          )}
         </span>
-      )}
+        <span class="mate-status">
+          <span class="status-text">{status}</span>
+          {working && (
+            <span class="mini-bar" aria-hidden="true">
+              <Fill key={working.until} from={working.from} until={working.until} offset={offset} cls="" />
+            </span>
+          )}
+        </span>
+      </span>
     </div>
   );
 }
 
 function Notes({ v }: { v: PlayerView }) {
   const j = v.journal;
-  if (!j.clues.length && !j.questions.length && !j.people.length) return <p class="muted pad">{T.emptyNotes}</p>;
+  if (!j.clues.length && !j.questions.length && !j.people.length) return <p class="empty">{T.emptyNotes}</p>;
   return (
     <div class="notes">
       {j.questions.length > 0 && (
-        <section class="card">
+        <section class="panel">
           <h3>{T.questions}</h3>
-          {j.questions.map((q) => (
-            <div class="question">
-              <span>{q.question}</span>
-              <span class={`level l${q.level}`}>{q.levelText}</span>
-            </div>
-          ))}
+          <ul class="questions">
+            {j.questions.map((q) => (
+              <li class="question">
+                <span>{q.question}</span>
+                <span class={`level l${q.level}`}>{q.levelText}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
       {j.clues.length > 0 && (
-        <section class="card">
+        <section class="panel">
           <h3>{T.clues}</h3>
-          {j.clues.map((c) => (
-            <div class={`clue ${c.personal ? 'personal' : ''}`}>
-              <div class="clue-head">
-                <b>{c.title}</b>
-                {c.personal && <span class="tag own">{T.personalShort}</span>}
-              </div>
-              <p>{c.text}</p>
-            </div>
-          ))}
+          <div class="clues">
+            {j.clues.map((c) => (
+              <article class={`clue ${c.personal ? 'personal' : ''}`}>
+                <div class="clue-head">
+                  <b>{c.title}</b>
+                  {c.personal && (
+                    <span class="pill mine">
+                      <IconEye />
+                      {T.personalShort}
+                    </span>
+                  )}
+                </div>
+                <p>{c.text}</p>
+              </article>
+            ))}
+          </div>
         </section>
       )}
       {j.people.length > 0 && (
-        <section class="card">
+        <section class="panel">
           <h3>{T.people}</h3>
-          {j.people.map((p) => (
-            <div class="person">
-              <b>{p.name}</b>
-              <p>{p.desc}</p>
-            </div>
-          ))}
+          <div class="people">
+            {j.people.map((p) => (
+              <div class="person">
+                <span class="avatar small">{p.name.slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <b>{p.name}</b>
+                  <p>{p.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </div>
@@ -254,7 +312,7 @@ function Notes({ v }: { v: PlayerView }) {
 
 function Log({ v }: { v: PlayerView }) {
   const items = [...v.log].reverse();
-  if (!items.length) return <p class="muted pad">{T.emptyLog}</p>;
+  if (!items.length) return <p class="empty">{T.emptyLog}</p>;
   return (
     <div class="log">
       {items.map((l, i) => (
@@ -293,15 +351,35 @@ export function Game({ s }: { s: NetState }) {
   const hasNotes = v.journal.clues.length + v.journal.questions.length + v.journal.people.length > 0;
   const groups = useMemo(() => v.groups.filter((g) => g.entries.length > 0 || g.desc), [v.groups]);
 
+  const tabs: Array<{ id: Tab; label: string; icon: JSX.Element; badge?: boolean }> = [
+    { id: 'work', label: T.tabWork, icon: <IconWork /> },
+    ...(hasNotes ? [{ id: 'notes' as Tab, label: T.tabNotes, icon: <IconNotes />, badge: newNotes && tab !== 'notes' }] : []),
+    { id: 'log', label: T.tabLog, icon: <IconLog /> },
+  ];
+
   const work = (
     <div class="work">
       {v.actDone && (
-        <section class="card actdone">
+        <section class="panel actdone">
           <h3>{T.actDone}</h3>
           <p>{v.actDone.text}</p>
         </section>
       )}
-      {v.stove.text && <p class={`stove ${v.stove.state}`}>{v.stove.text}</p>}
+      {v.goal && (
+        <div class="goal">
+          <IconTarget />
+          <span>
+            <span class="goal-label">{T.goal}</span>
+            {v.goal}
+          </span>
+        </div>
+      )}
+      {v.stove.text && (
+        <p class={`stove ${v.stove.state}`}>
+          {v.stove.state === 'cold' ? <IconSnow /> : <IconFlame />}
+          <span>{v.stove.text}</span>
+        </p>
+      )}
       <div class="only-mobile">
         <Stock v={v} />
       </div>
@@ -314,40 +392,27 @@ export function Game({ s }: { s: NetState }) {
   return (
     <div class="game">
       <header class="top">
-        <div class="top-row">
-          <span class="brand">{T.title}</span>
-          <span class="where small">{v.me.where}</span>
-          {v.me.role && <span class="muted small">{v.day > 0 ? `${T.day} ${v.day}` : ''}</span>}
+        <span class="brand">{T.title}</span>
+        <div class="top-info">
+          <span class="place">
+            <IconPin />
+            <span>{v.me.where}</span>
+          </span>
+          {v.day > 0 && (
+            <span class="day">
+              {T.day} {v.day}
+            </span>
+          )}
           <span class={`net ${s.connected ? 'ok' : 'bad'}`} title={s.connected ? T.onlineDot : T.offlineDot} />
         </div>
         <Partner v={v} now={now} offset={s.offset} />
-        {v.goal && (
-          <div class="goal">
-            <span class="muted">{T.goal}:</span> {v.goal}
-          </div>
-        )}
         {!s.connected && <div class="warn-bar">{T.reconnecting}</div>}
         {v.busyUntil > now && (
           <div class="me-progress" aria-hidden="true">
             <Fill key={v.busyUntil} from={v.busyFrom} until={v.busyUntil} offset={s.offset} cls="" />
           </div>
         )}
-        <nav class="tabs only-mobile">
-          <button class={tab === 'work' ? 'on' : ''} onClick={() => setTab('work')}>
-            {T.tabWork}
-          </button>
-          {hasNotes && (
-            <button class={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
-              {T.tabNotes}
-              {newNotes && tab !== 'notes' && <span class="badge" />}
-            </button>
-          )}
-          <button class={tab === 'log' ? 'on' : ''} onClick={() => setTab('log')}>
-            {T.tabLog}
-          </button>
-        </nav>
       </header>
-
 
       <main class="layout">
         <aside class="col-left only-desktop">
@@ -364,23 +429,48 @@ export function Game({ s }: { s: NetState }) {
           <Notes v={v} />
         </div>
         <aside class={`col-right ${tab === 'log' ? '' : 'hide-mobile'}`}>
+          <h3 class="only-desktop">{T.tabLog}</h3>
           <Log v={v} />
         </aside>
       </main>
+
+      <nav class="bottom-nav only-mobile">
+        {tabs.map((t) => (
+          <button
+            class={tab === t.id ? 'on' : ''}
+            onClick={() => {
+              setTab(t.id);
+              window.scrollTo({ top: 0 });
+            }}
+          >
+            <span class="nav-ico">
+              {t.icon}
+              {t.badge && <span class="badge" />}
+            </span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
 
       {v.proposal && !v.scene && (
         <div class="proposal">
           {v.proposal.mine ? (
             <>
-              <span>{v.proposal.text}</span>
+              <span class="proposal-text">
+                <IconPair />
+                <span>{v.proposal.text}</span>
+              </span>
               <button class="btn small" disabled={locked} onClick={() => net.send({ c: 'cancel' })}>
                 {T.cancel}
               </button>
             </>
           ) : (
             <>
-              <span>
-                {v.proposal.text} <b>«{v.proposal.label}»</b>
+              <span class="proposal-text">
+                <IconPair />
+                <span>
+                  {v.proposal.text} <b>«{v.proposal.label}»</b>
+                </span>
               </span>
               <div class="row">
                 <button class="btn primary small" disabled={locked} onClick={() => net.send({ c: 'accept' })}>

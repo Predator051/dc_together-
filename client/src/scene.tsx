@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { PlayerView, SceneView } from '../../shared/src/protocol.js';
 import { net } from './net.js';
+import { IconCheck, IconChevron, IconEye } from './icons.js';
 import { T } from './strings.js';
 
 function Bar({ value, max, kind }: { value: number; max: number; kind: string }) {
@@ -60,7 +61,10 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
               ))}
               {b.own.length > 0 && (
                 <div class="own">
-                  <div class="own-label">{T.personal}</div>
+                  <div class="own-label">
+                    <IconEye />
+                    {T.personal}
+                  </div>
                   {b.own.map((p) => (
                     <p>{p}</p>
                   ))}
@@ -79,7 +83,7 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
           {sc.combat && (
             <div class="combat">
               <div class="combat-row">
-                <span>{sc.combat.enemy}</span>
+                <b>{sc.combat.enemy}</b>
                 <span class="muted small">
                   {T.combatRound} {sc.combat.round}
                 </span>
@@ -120,15 +124,21 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
           )}
           {!sc.paused && sc.kind !== 'text' && (
             <div class="options">
-              {sc.partnerPicked && !sc.myPick && <p class="muted small">{v.partner.name} — ✓</p>}
+              {sc.partnerPicked && !sc.myPick && <p class="partner-picked">
+                  <IconCheck />
+                  {v.partner.name}
+                </p>}
               {options.map((o) => (
                 <button
-                  class={`btn wide ${sc.myPick === o.id ? 'on' : ''}`}
+                  class={`opt ${sc.myPick === o.id ? 'on' : ''}`}
                   disabled={!o.enabled || !canAct || !!sc.myPick}
                   onClick={() => net.send({ c: 'choose', id: o.id })}
                 >
-                  <span>{o.label}</span>
-                  {o.reason && <em class="reason">{o.reason}</em>}
+                  <span class="opt-body">
+                    <span>{o.label}</span>
+                    {o.reason && <em class="reason">{o.reason}</em>}
+                  </span>
+                  {sc.myPick === o.id ? <IconCheck /> : <IconChevron />}
                 </button>
               ))}
             </div>
