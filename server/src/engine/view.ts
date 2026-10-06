@@ -301,11 +301,15 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
   if (ambKind === 'cellar' || ambKind === 'candle') fire = 'none';
   const fxOf = (pl: typeof me) =>
     pl.busy && pl.busy.until > g.now ? (amb?.actions[pl.busy.action] ?? null) : null;
+  const fx = fxOf(me);
+  const partnerFx = o.joined && o.online && o.at === here ? fxOf(o) : null;
   const ambient: PlayerView['ambient'] = {
     kind: ambKind,
     fire,
-    fx: fxOf(me),
-    partnerFx: o.joined && o.online && o.at === here ? fxOf(o) : null,
+    fx,
+    partnerFx,
+    fxUntil: fx ? me.busy!.until : 0,
+    partnerFxUntil: partnerFx ? o.busy!.until : 0,
   };
 
   let partnerBusy: { text: string; from: number; until: number } | null = null;

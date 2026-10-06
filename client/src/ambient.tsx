@@ -44,7 +44,7 @@ class Engine {
   private dpr = 1;
   private back: P[] = [];
   private front: P[] = [];
-  private s: State = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, paused: true };
+  private s: State = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, fxUntil: 0, partnerFxUntil: 0, paused: true };
   private raf = 0;
   private last = 0;
   /** Seconds until the next emission, per emitter key. */
@@ -171,12 +171,32 @@ class Engine {
   }
 
   // ---------- foreground: action accents ----------
+  /** Accents happen under the column with the actions: its centre, mine left of it, the partner's right. */
+  private anchor(): { x: number; spread: number } {
+    const col = document.querySelector('.col-mid');
+    const r = col?.getBoundingClientRect();
+    if (!r || r.width === 0) return { x: this.w / 2, spread: Math.min(this.w * 0.2, 140) };
+    return { x: r.left + r.width / 2, spread: Math.min(r.width * 0.2, 140) };
+  }
+
   private accents(dt: number) {
     const base = this.baseline();
-    if (this.s.fx) this.emit('me', this.s.fx, this.w * 0.3, base, dt, false);
-    else this.walkX.delete('me');
-    if (this.s.partnerFx) this.emit('mate', this.s.partnerFx, this.w * 0.7, base, dt, true);
-    else this.walkX.delete('mate');
+    const { x, spread } = this.anchor();
+    const both = !!this.s.fx && !!this.s.partnerFx;
+    for (const [who, fx, mate] of [
+      ['me', this.s.fx, false],
+      ['mate', this.s.partnerFx, true],
+    ] as const) {
+      if (fx) {
+        // alone: right in the centre; together: side by side
+        const x0 = both ? x + (mate ? spread : -spread) : x;
+        this.emit(who, fx, x0, base, dt, mate, both ? spread : spread * 2);
+      } else {
+        // the action is over: forget its rhythm so the next one starts with a beat
+        this.walkX.delete(who);
+        for (const k of [...this.timers.keys()]) if (k.startsWith(`${who}:`)) this.timers.delete(k);
+      }
+    }
   }
 
   private tick(key: string, dt: number, every: number): boolean {
@@ -189,7 +209,7 @@ class Engine {
     return true;
   }
 
-  private emit(who: string, fx: Fx, x0: number, y0: number, dt: number, mate: boolean) {
+  private emit(who: string, fx: Fx, x0: number, y0: number, dt: number, mate: boolean, room: number) {
     const k = `${who}:${fx}`;
     const beat = (every: number) => {
       const go = this.tick(k, dt, every);
@@ -232,8 +252,9 @@ class Engine {
         break;
       case 'walk': {
         if (!beat(0.5)) break;
-        const start = mate ? this.w * 0.55 : this.w * 0.08;
-        const span = this.w * 0.35;
+        // a short track that crosses the spot where the accent lives
+        const span = Math.max(80, room * 0.9);
+        const start = x0 - span / 2;
         const x = this.walkX.get(who) ?? 0;
         this.walkX.set(who, (x + 18) % span);
         this.stepNo++;

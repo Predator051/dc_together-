@@ -210,6 +210,9 @@ export interface AmbientView {
   fx: FxKind | null;
   /** Accent of the partner's running action, only when the partner is here and online. */
   partnerFx: FxKind | null;
+  /** Server time when each accent ends (the view is not resent when an action just runs out). */
+  fxUntil: number;
+  partnerFxUntil: number;
 }
 
 export interface PlayerView {

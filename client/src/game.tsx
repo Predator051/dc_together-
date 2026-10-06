@@ -303,6 +303,7 @@ export function Game({ s }: { s: NetState }) {
   const moments: number[] = [v.busyUntil, v.busyUntil + SAFETY_MS];
   for (const g of v.groups) for (const e of g.entries) if (e.readyAt) moments.push(e.readyAt, e.readyAt + SAFETY_MS);
   if (v.partner.busy) moments.push(v.partner.busy.until);
+  moments.push(v.ambient.fxUntil, v.ambient.partnerFxUntil);
   const now = useServerClock(s.offset, moments);
   // Pending clicks are swallowed in net.send (no visual flicker); a stale view locks visibly.
   const locked = s.stale || !s.connected;
@@ -360,7 +361,15 @@ export function Game({ s }: { s: NetState }) {
 
   return (
     <div class="game">
-      <Ambient a={v.ambient} paused={!!v.scene} />
+      <Ambient
+        a={{
+          ...v.ambient,
+          // accents stop exactly when the action runs out, without waiting for the next update
+          fx: v.ambient.fxUntil > now ? v.ambient.fx : null,
+          partnerFx: v.ambient.partnerFxUntil > now ? v.ambient.partnerFx : null,
+        }}
+        paused={!!v.scene}
+      />
       <header class="top">
         <span class="brand">{T.title}</span>
         <div class="top-info">

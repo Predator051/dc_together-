@@ -10,7 +10,7 @@ describe('visual ambience', () => {
     w.join('Оксана', 'f', 'maker');
     w.online('p1');
     w.online('p2');
-    expect(w.view('p1').ambient).toEqual({ kind: 'cellar', fire: 'none', fx: null, partnerFx: null });
+    expect(w.view('p1').ambient).toEqual({ kind: 'cellar', fire: 'none', fx: null, partnerFx: null, fxUntil: 0, partnerFxUntil: 0 });
 
     // The candle in the cellar.
     for (const pid of ['p1', 'p2'] as const) {
@@ -25,6 +25,9 @@ describe('visual ambience', () => {
     // Lighting the candle shows its accent to the one doing it and, nearby, to the partner.
     expect(w.view('p1').ambient.fx).toBe('sparks');
     expect(w.view('p2').ambient.partnerFx).toBe('sparks');
+    // the end time lets the client stop the accent on time
+    expect(w.view('p1').ambient.fxUntil).toBe(w.view('p1').busyUntil);
+    expect(w.view('p2').ambient.partnerFxUntil).toBe(w.view('p1').busyUntil);
     w.advance(5000);
     expect(w.view('p1').ambient).toMatchObject({ kind: 'candle', fx: null });
   });

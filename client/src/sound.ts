@@ -34,7 +34,7 @@ class Sound {
   private fireBed: Bed | null = null;
   private hiss: Bed | null = null;
   private timers: number[] = [];
-  private state: AmbientView & { scene: boolean } = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, scene: false };
+  private state: AmbientView & { scene: boolean } = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, fxUntil: 0, partnerFxUntil: 0, scene: false };
   private bedKind: string | null = null;
   private fireKind: string | null = null;
   private listeners = new Set<() => void>();
