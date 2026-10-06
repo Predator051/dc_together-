@@ -214,6 +214,11 @@ export class Net {
   clearToast(): void {
     this.set({ toast: null });
   }
+
+  /** A short message from the client itself (e.g. the browser refused notifications). */
+  showToast(text: string): void {
+    this.set({ toast: { text, id: Date.now() } });
+  }
 }
 
 export const net = new Net();

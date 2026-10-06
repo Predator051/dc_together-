@@ -156,6 +156,21 @@ describe('connection and access', () => {
 });
 
 describe('synchronisation', () => {
+  it('closing a one-time panel (summary, return) goes through the socket', async () => {
+    await boot();
+    const [a, b] = await pair();
+    running!.game.state.meta.actDone = 1;
+    running!.game.state.players.p1.welcome = { at: 0, day: 0, res: {}, log: 0 };
+    const r1 = await a.cmd({ c: 'ack', what: 'summary' });
+    expect(r1.ok).toBe(true);
+    expect(running!.game.state.players.p1.seenSummary).toBe(1);
+    expect(running!.game.state.players.p2.seenSummary).toBe(0);
+    const r2 = await a.cmd({ c: 'ack', what: 'welcome' });
+    expect(r2.ok).toBe(true);
+    expect(running!.game.state.players.p1.welcome).toBeNull();
+    await settle(b);
+  });
+
   it('simultaneous actions both apply and both players see them', async () => {
     await boot();
     const [a, b] = await pair();

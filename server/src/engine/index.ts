@@ -24,6 +24,9 @@ import type { Command } from '../../../shared/src/protocol.js';
 import { Rng } from '../../../shared/src/rng.js';
 import type { LogEntry, PlayerState, WorldState } from '../../../shared/src/state.js';
 import { STATE_VERSION } from '../../../shared/src/state.js';
+
+/** How long a player must have been gone to get a summary on return. */
+export const WELCOME_AFTER = 3 * 60 * 1000;
 import { cap, fill, resolveText, type Persona } from './text.js';
 
 export const LOG_LIMIT = 400;
@@ -398,6 +401,7 @@ export class Game {
     }
     if ('advanceDay' in e) {
       this.s.meta.day += 1;
+      this.s.meta.dayAt = this.now;
       const text: Partial<Record<PlayerId, string>> = {};
       for (const pid of this.joinedIds()) text[pid] = `${this.ix.ui('new_day')} ${this.s.meta.day}.`;
       this.logRaw('system', text);
@@ -542,6 +546,11 @@ export class Game {
     }
     this.apply(a.effects, pid);
     this.logGains(pid, gained, mainId);
+    const st = this.s.stats;
+    st.actions[pid] = (st.actions[pid] ?? 0) + 1;
+    for (const [r, n] of Object.entries(gained)) if (n > 0) st.gathered[r] = (st.gathered[r] ?? 0) + n;
+    if (a.kind === 'craft') st.crafted += 1;
+    if ((a.effects ?? []).some((e) => 'moveTo' in e)) st.trips += 1;
 
     if (a.once) this.s.flags[`built:${a.id}`] = 1;
     if (a.oncePerPlayer) p.flags[`built:${a.id}`] = 1;
@@ -674,6 +683,7 @@ export class Game {
       combat: null,
       startedAt: this.now,
     };
+    if (def.pool) this.s.stats.suppers += 1;
     this.enterNode(def.start);
   }
 
@@ -915,6 +925,11 @@ export class Game {
       case 'choose':
         r = this.choose(pid, cmd.id);
         break;
+      case 'ack':
+        if (cmd.what === 'welcome') p.welcome = null;
+        else p.seenSummary = this.s.meta.actDone;
+        r = OK;
+        break;
       default:
         r = this.fail('err_not_now');
     }
@@ -929,6 +944,13 @@ export class Game {
     if (p.online === online) return;
     p.online = online;
     p.lastSeen = this.now;
+    if (!online) {
+      p.away = { at: this.now, day: this.s.meta.day, res: { ...this.s.res }, log: this.s.meta.nextLogId };
+    } else if (p.away) {
+      // a real absence (not a dropped connection) earns a "while you were away" summary
+      if (this.now - p.away.at >= WELCOME_AFTER) p.welcome = p.away;
+      p.away = null;
+    }
     if (!online) {
       if (this.s.proposal) this.s.proposal = null;
       if (this.s.scene) this.s.scene.paused = true;
@@ -994,6 +1016,9 @@ function blankPlayer(id: PlayerId, hp: number, now: number, at = 'yas'): PlayerS
     busy: null,
     online: false,
     lastSeen: now,
+    away: null,
+    welcome: null,
+    seenSummary: 0,
   };
 }
 
@@ -1005,7 +1030,8 @@ export function newWorld(content: Content, seed: number, now: number): WorldStat
   for (const [k, v] of Object.entries(res)) if (v > 0) seenRes[k] = 1;
   return {
     version: STATE_VERSION,
-    meta: { seed, rng: seed >>> 0, createdAt: now, lastTick: now, day: 1, act: 1, nextLogId: 1, actDone: 0 },
+    meta: { seed, rng: seed >>> 0, createdAt: now, lastTick: now, day: 1, act: 1, nextLogId: 1, actDone: 0, dayAt: now },
+    stats: { gathered: {}, actions: { p1: 0, p2: 0 }, crafted: 0, trips: 0, suppers: 0 },
     players: {
       p1: blankPlayer('p1', content.start.hp, now, content.areas[0]!.id),
       p2: blankPlayer('p2', content.start.hp, now, content.areas[0]!.id),

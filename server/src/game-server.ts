@@ -335,6 +335,10 @@ function validCommand(cmd: unknown): Command | null {
     case 'cancel':
     case 'next':
       return { c: c.c } as Command;
+    case 'ack': {
+      const what = (cmd as { what?: unknown }).what;
+      return what === 'welcome' || what === 'summary' ? { c: 'ack', what } : null;
+    }
     default:
       return null;
   }

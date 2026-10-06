@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { content } from '../content/index.js';
 import { STATE_VERSION } from '../shared/src/state.js';
-import { newWorld } from '../server/src/engine/index.js';
+import { ContentIndex, Game, newWorld } from '../server/src/engine/index.js';
+import { buildView } from '../server/src/engine/view.js';
 import { GameServer } from '../server/src/game-server.js';
 import { MigrationError, migrateState, type Migration } from '../server/src/migrations.js';
 import { Storage } from '../server/src/storage.js';
@@ -49,12 +50,42 @@ describe('world state migrations', () => {
     const { state, from, migrated } = migrateState(JSON.parse(JSON.stringify(s)), content, 0);
     expect(from).toBe(1);
     expect(migrated).toBe(true);
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.players.p1.at).toBe('yas');
     expect(state.players.p2.at).toBe('yas');
     expect(state.flags['a1_done']).toBe(1);
     expect(state.res['res_01']).toBe(7);
     expect(state.res['res_22']).toBe(0);
+  });
+
+  it('real migration v2 -> v3: an old world at the end of act 3 gets counters and shows its summary once', () => {
+    const s = newWorld(content, 1, 0) as unknown as Record<string, any>;
+    s.version = 2;
+    delete s.stats;
+    delete s.meta.dayAt;
+    for (const pid of ['p1', 'p2']) {
+      delete s.players[pid].away;
+      delete s.players[pid].welcome;
+      delete s.players[pid].seenSummary;
+      s.players[pid].joined = true;
+      s.players[pid].role = pid === 'p1' ? 'hunter' : 'maker';
+      s.players[pid].name = pid;
+    }
+    s.meta.actDone = 3;
+    s.meta.day = 40;
+    s.meta.lastTick = 555;
+    const { state } = migrateState(JSON.parse(JSON.stringify(s)), content, 1000);
+    expect(state.version).toBe(STATE_VERSION);
+    expect(state.stats).toEqual({ gathered: {}, actions: { p1: 0, p2: 0 }, crafted: 0, trips: 0, suppers: 0 });
+    expect(state.meta.dayAt).toBe(555);
+    expect(state.players.p1.seenSummary).toBe(0);
+    const g = new Game(new ContentIndex(content), state, 1000);
+    const v = buildView(g, 'p1');
+    expect(v.summary?.act).toBe(3);
+    expect(v.summary?.days).toBe(40);
+    g.command('p1', { c: 'ack', what: 'summary' });
+    expect(buildView(g, 'p1').summary).toBeNull();
+    expect(buildView(g, 'p2').summary?.act).toBe(3); // each player closes their own
   });
 
   it('drops an in-progress scene that no longer exists, keeping the world playable', () => {

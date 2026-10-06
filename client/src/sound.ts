@@ -81,6 +81,9 @@ interface Bed {
   stop: () => void;
 }
 
+type Mood = 'hearth' | 'fight' | 'story' | null;
+type SoundState = AmbientView & { scene: boolean; mood: Mood; dusk: number };
+
 class Sound {
   on = loadOn();
   private ctx: BaseAudioContext | null = null;
@@ -92,7 +95,9 @@ class Sound {
   private bed: Bed | null = null;
   private fireBed: Bed | null = null;
   private hiss: Bed | null = null;
-  private state: AmbientView & { scene: boolean } = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, fxUntil: 0, partnerFxUntil: 0, scene: false };
+  private state: SoundState = { kind: 'snow', fire: 'none', fx: null, partnerFx: null, fxUntil: 0, partnerFxUntil: 0, scene: false, mood: null, dusk: 0 };
+  private moodBed: Bed | null = null;
+  private moodKind: Mood = null;
   private bedKind: string | null = null;
   private fireKind: string | null = null;
   private listeners = new Set<() => void>();
@@ -134,7 +139,7 @@ class Sound {
   }
 
   /** The place, its fire and continuous accents. */
-  set(s: AmbientView & { scene: boolean }): void {
+  set(s: SoundState): void {
     this.state = s;
     if (this.ctx && this.on) this.apply();
   }
@@ -194,7 +199,14 @@ class Sound {
   private apply(): void {
     const ctx = this.ctx!;
     const s = this.state;
-    this.bedBus.gain.setTargetAtTime(s.scene ? 0.55 : 1, ctx.currentTime, 0.8);
+    // a scene quiets the place; evening quiets it a little more
+    this.bedBus.gain.setTargetAtTime((s.scene ? 0.55 : 1) * (1 - s.dusk * 0.3), ctx.currentTime, 0.8);
+    const mood = s.scene ? s.mood : null;
+    if (mood !== this.moodKind) {
+      this.fadeOut(this.moodBed);
+      this.moodBed = mood ? this.makeMood(mood) : null;
+      this.moodKind = mood;
+    }
 
     const bedKind = s.kind;
     if (bedKind !== this.bedKind) {
@@ -525,6 +537,67 @@ class Sound {
       stop: () => {
         for (const n of nodes) n.stop();
         for (const t of timers) window.clearTimeout(t);
+        out.disconnect();
+      },
+    };
+  }
+
+  /** The sound of a scene: a warm drone by the fire, a low throb in a fight, a faint pad otherwise. */
+  private makeMood(mood: NonNullable<Mood>): Bed {
+    const ctx = this.ctx!;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(this.master);
+    const nodes: AudioScheduledSourceNode[] = [];
+    const pad = (freqs: readonly number[], level: number, cutoff: number) => {
+      const lp = this.filter('lowpass', cutoff, 0.6);
+      lp.connect(out);
+      for (const f of freqs) {
+        const o = ctx.createOscillator();
+        o.type = 'triangle';
+        o.frequency.value = f;
+        o.detune.value = rnd(-6, 6);
+        const g = ctx.createGain();
+        g.gain.value = level;
+        o.connect(g).connect(lp);
+        o.start();
+        nodes.push(o, this.lfo(g.gain, rnd(0.05, 0.12), level * 0.5));
+      }
+    };
+    let fire: Bed | null = null;
+    if (mood === 'hearth') {
+      pad([110, 130.8, 164.8], 0.022, 700); // A minor, low and warm
+      if (this.fireKind === 'none' || this.fireKind === null) {
+        fire = this.makeFire(0.8);
+        // route it through this scene's output, so it fades out with it
+        fire.out.disconnect();
+        fire.out.connect(out);
+      }
+    } else if (mood === 'fight') {
+      // a low throb, like blood in the ears, and a thin whistling wind
+      const o = ctx.createOscillator();
+      o.frequency.value = 46;
+      const g = ctx.createGain();
+      g.gain.value = 0.07;
+      o.connect(g).connect(out);
+      o.start();
+      nodes.push(o, this.lfo(g.gain, 1.6, 0.065));
+      const n = this.noiseSrc();
+      const bp = this.filter('bandpass', 1300, 9);
+      const g2 = ctx.createGain();
+      g2.gain.value = 0.035;
+      n.connect(bp).connect(g2).connect(out);
+      n.start();
+      nodes.push(n, this.lfo(bp.frequency, 0.13, 350));
+    } else {
+      pad([73.4, 110], 0.014, 500); // D and A, barely there
+    }
+    out.gain.setTargetAtTime(1, ctx.currentTime, 1.5);
+    return {
+      out,
+      stop: () => {
+        for (const n of nodes) n.stop();
+        fire?.stop();
         out.disconnect();
       },
     };

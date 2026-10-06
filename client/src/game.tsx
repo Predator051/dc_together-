@@ -1,13 +1,14 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { EntryView, GroupView, MateEntryView, PlayerView } from '../../shared/src/protocol.js';
+import type { EntryView, GroupView, MateEntryView, PlayerView, SummaryView, WelcomeView } from '../../shared/src/protocol.js';
 import type { NetState } from './net.js';
 import { net } from './net.js';
 import { Ambient } from './ambient.js';
 import { Notes, useSeenClues } from './notes.js';
+import { notifier } from './notify.js';
 import { sound } from './sound.js';
 import { Scene } from './scene.js';
-import { IconDown, IconFlame, IconLock, IconLog, IconMute, IconNotes, IconPair, IconPin, IconSnow, IconSound, IconWork } from './icons.js';
+import { IconBell, IconBellOff, IconDown, IconFlame, IconLock, IconLog, IconMute, IconNotes, IconPair, IconPin, IconSnow, IconSound, IconWork } from './icons.js';
 import { T } from './strings.js';
 
 type Tab = 'work' | 'notes' | 'log';
@@ -295,6 +296,145 @@ function SoundToggle() {
   );
 }
 
+function NotifyToggle() {
+  const [, force] = useState(0);
+  useEffect(() => notifier.subscribe(() => force((x) => x + 1)), []);
+  const label = notifier.on ? T.notifyOff : T.notifyOn;
+  const click = async () => {
+    const err = await notifier.toggle({ denied: T.notifyDenied, unsupported: T.notifyUnsupported });
+    if (err) net.showToast(err);
+  };
+  return (
+    <button class={`sound-toggle ${notifier.on ? 'on' : ''}`} aria-label={label} title={label} onClick={click}>
+      {notifier.on ? <IconBell /> : <IconBellOff />}
+    </button>
+  );
+}
+
+function plus(n: number): string {
+  return n > 0 ? `+${n}` : `−${-n}`;
+}
+
+/** "While you were away": shown once after a real absence. */
+function Welcome({ w, partner }: { w: WelcomeView; partner: string }) {
+  return (
+    <div class="sheet-wrap" role="dialog" aria-labelledby="welcome-title">
+      <section class="sheet">
+        <h2 id="welcome-title">{T.awayTitle}</h2>
+        {w.days > 0 && (
+          <p class="sheet-line">
+            <span class="sheet-key">{T.awayDays}</span> <b>{w.days}</b>
+          </p>
+        )}
+        {w.res.length > 0 && (
+          <div class="sheet-block">
+            <h3>{T.awayStock}</h3>
+            <p class="sheet-deltas">
+              {w.res.map((r) => (
+                <span class={r.n > 0 ? 'plus' : 'minus'}>
+                  {r.name} {plus(r.n)}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
+        {w.lines.length > 0 && (
+          <div class="sheet-block">
+            <h3>{partner}</h3>
+            <div class="log">
+              {w.lines.map((l) => (
+                <p class="from-partner">{l}</p>
+              ))}
+            </div>
+          </div>
+        )}
+        {w.clues > 0 && (
+          <p class="sheet-line">
+            <span class="sheet-key">{T.awayClues}</span> <b>{w.clues}</b>
+          </p>
+        )}
+        <button class="btn primary sheet-ok" onClick={() => net.send({ c: 'ack', what: 'welcome' })}>
+          {T.ok}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+const ACT_NAMES = ['', T.act1, T.act2, T.act3, T.act4, T.act5];
+
+/** The end of an act: what the two of you have been through, in numbers. */
+function Summary({ s, me, partner }: { s: SummaryView; me: string; partner: string }) {
+  const rows: Array<[string, string | number]> = [
+    [T.sDays, s.days],
+    [T.sPlaces, s.places],
+    [T.sScenes, s.scenes],
+    [T.sClues, s.clues],
+    [T.sCluesMine, s.cluesMine],
+    [T.sSolved, s.solved],
+    [T.sPeople, s.people],
+    [T.sFights, s.fights],
+  ];
+  const counted: Array<[string, string | number]> = [
+    [T.sSuppers, s.suppers],
+    [T.sCrafted, s.crafted],
+    [T.sTrips, s.trips],
+  ];
+  const anyCounted = s.actions.me + s.actions.partner > 0;
+  return (
+    <div class="sheet-wrap" role="dialog" aria-labelledby="summary-title">
+      <section class="sheet summary">
+        <h2 id="summary-title">
+          {T.summaryTitle} {ACT_NAMES[s.act] ?? s.act}
+        </h2>
+        <dl class="ledger summary-ledger">
+          {rows
+            .filter(([, v]) => v !== 0)
+            .map(([k, v]) => (
+              <div class="ledger-row">
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          {anyCounted &&
+            counted
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => (
+                <div class="ledger-row">
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+        </dl>
+        {anyCounted && (
+          <div class="sheet-block">
+            <h3>{T.sActions}</h3>
+            <p class="sheet-line">
+              {me} <b>{s.actions.me}</b> · {partner} <b>{s.actions.partner}</b>
+            </p>
+          </div>
+        )}
+        {s.gathered.length > 0 && (
+          <div class="sheet-block">
+            <h3>{T.sGathered}</h3>
+            <p class="sheet-deltas">
+              {s.gathered.map((r) => (
+                <span class="plus">
+                  {r.name} {r.n}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
+        {!anyCounted && <p class="sheet-note">{T.sSince}</p>}
+        <button class="btn primary sheet-ok" onClick={() => net.send({ c: 'ack', what: 'summary' })}>
+          {T.next}
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function Partner({ v, now, offset }: { v: PlayerView; now: number; offset: number }) {
   const p = v.partner;
   if (!p.joined)
@@ -371,8 +511,37 @@ export function Game({ s }: { s: NetState }) {
   // The partner calls you: a knock.
   const calling = v.proposal && !v.proposal.mine ? v.proposal.label : null;
   useEffect(() => {
-    if (calling) sound.call();
+    if (!calling) return;
+    sound.call();
+    notifier.ping('call', `${v.partner.name} ${T.notifyCalls}`, `«${calling}»`);
   }, [calling]);
+
+  // A scene begins (e.g. the partner accepted while this tab was in the background).
+  const sceneId = v.scene?.id ?? null;
+  useEffect(() => {
+    if (sceneId && v.scene) notifier.ping('scene', `${T.notifyScene}: ${v.scene.title}`);
+  }, [sceneId]);
+
+  // The partner comes back.
+  const partnerOn = v.partner.online;
+  const wasOn = useRef(partnerOn);
+  useEffect(() => {
+    if (partnerOn && !wasOn.current) notifier.ping('back', `${v.partner.name} ${T.notifyBack}`);
+    wasOn.current = partnerOn;
+  }, [partnerOn]);
+
+  // A long task of mine is done while the game is in the background.
+  const running = v.busyUntil > now ? v.busyAction : null;
+  const lastRun = useRef<{ id: string; long: boolean } | null>(null);
+  useEffect(() => {
+    if (running) {
+      const label = v.groups.flatMap((g) => g.entries).find((e) => e.id === running)?.label ?? '';
+      lastRun.current = { id: label, long: v.busyUntil - v.busyFrom >= 20_000 };
+    } else if (lastRun.current) {
+      if (lastRun.current.long) notifier.ping('done', T.notifyDone, lastRun.current.id);
+      lastRun.current = null;
+    }
+  }, [running]);
 
   useEffect(() => {
     if (!s.toast) return;
@@ -427,6 +596,9 @@ export function Game({ s }: { s: NetState }) {
           partnerFx: v.ambient.partnerFxUntil > now ? v.ambient.partnerFx : null,
         }}
         paused={!!v.scene}
+        mood={v.scene && !v.scene.paused ? v.scene.mood : null}
+        dayAt={v.dayAt}
+        offset={s.offset}
       />
       <header class="top">
         <span class="brand">{T.title}</span>
@@ -440,6 +612,7 @@ export function Game({ s }: { s: NetState }) {
               {T.day} {v.day}
             </span>
           )}
+          <NotifyToggle />
           <SoundToggle />
           <span class={`net ${s.connected ? 'ok' : 'bad'}`} title={s.connected ? T.onlineDot : T.offlineDot} />
         </div>
@@ -548,6 +721,8 @@ export function Game({ s }: { s: NetState }) {
       )}
 
       {v.scene && <Scene v={v} sc={v.scene} locked={locked} />}
+      {!v.scene && v.summary && <Summary s={v.summary} me={v.me.name} partner={v.partner.name} />}
+      {!v.scene && !v.summary && v.welcome && <Welcome w={v.welcome} partner={v.partner.name} />}
       {s.toast && <div class="toast">{s.toast.text}</div>}
       {s.deltas.length > 0 && (
         <div class="deltas" aria-live="polite">

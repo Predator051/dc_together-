@@ -233,8 +233,57 @@ b {
   animation: flicker 2.6s ease-in-out infinite alternate;
   transform-origin: 50% 30%;
 }
+/* evening: the page darkens and cools as a long day draws on; supper brings the morning */
+.amb-dusk {
+  opacity: 0;
+  background:
+    radial-gradient(140% 100% at 50% 110%, transparent 30%, rgba(8, 10, 22, 0.55)),
+    rgba(10, 12, 24, 0.35);
+  transition: opacity 30s linear;
+}
+
+/* the mood of a scene: firelight at a supper, a dark red pulse in a fight */
+.scene.mood-hearth {
+  background:
+    radial-gradient(90% 45% at 50% 105%, rgba(240, 140, 60, 0.16), transparent 70%),
+    radial-gradient(120% 70% at 50% 0%, rgba(221, 184, 103, 0.07), transparent 65%),
+    var(--leaf);
+}
+.scene.mood-hearth .scene-body {
+  animation: hearth 4s ease-in-out infinite alternate;
+}
+@keyframes hearth {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.04);
+  }
+}
+.scene.mood-fight {
+  box-shadow:
+    inset 0 0 80px rgba(194, 78, 54, 0.18),
+    0 -10px 50px rgba(0, 0, 0, 0.6);
+  animation: sheet 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both, threat 2.4s ease-in-out infinite;
+}
+@keyframes threat {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 60px rgba(194, 78, 54, 0.12),
+      0 -10px 50px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 110px rgba(194, 78, 54, 0.26),
+      0 -10px 50px rgba(0, 0, 0, 0.6);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .amb-glow {
+  .amb-glow,
+  .scene.mood-hearth .scene-body,
+  .scene.mood-fight {
     animation: none !important;
   }
 }
@@ -1729,6 +1778,89 @@ mark {
 }
 .scene-mini b {
   color: var(--gall);
+}
+
+/* ---------- one-time sheets: "while you were away", end-of-act summary ---------- */
+.sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  padding-top: calc(20px + env(safe-area-inset-top));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  background: rgba(10, 7, 4, 0.7);
+}
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 22px 20px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--rule-2);
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(221, 184, 103, 0.08), transparent 65%),
+    var(--leaf);
+  box-shadow: var(--shadow);
+  animation: sheet 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sheet h2 {
+  margin-bottom: 14px;
+  font-size: 1.35rem;
+}
+.sheet h2::first-letter {
+  color: var(--cinnabar);
+}
+.sheet-block {
+  margin: 14px 0;
+}
+.sheet-block h3 {
+  margin-bottom: 6px;
+}
+.sheet-line {
+  margin: 6px 0;
+  font-family: var(--sans);
+}
+.sheet-key {
+  color: var(--faded);
+}
+.sheet-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-family: var(--sans);
+  font-weight: 600;
+}
+.sheet-deltas .plus {
+  color: var(--verdigris);
+}
+.sheet-deltas .minus {
+  color: var(--cinnabar-ink);
+}
+.sheet .log p {
+  font-size: 0.95rem;
+}
+.summary-ledger {
+  grid-template-columns: 1fr;
+}
+.summary-ledger .ledger-row {
+  padding: 3px 0;
+  font-size: 1rem;
+}
+.sheet-note {
+  margin: 12px 0 0;
+  color: var(--pale);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+}
+.sheet-ok {
+  width: 100%;
+  margin-top: 16px;
+  min-height: 50px;
 }
 
 /* ---------- stock change popups: top center on every screen ---------- */

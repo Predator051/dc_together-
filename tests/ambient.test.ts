@@ -44,6 +44,22 @@ describe('visual ambience', () => {
     expect(w.view('p2').ambient.partnerFx).toBeNull();
   });
 
+  it('scenes carry a mood: a supper is by the fire, the rest is the story', () => {
+    const w = new World(6);
+    w.join('Марко', 'm', 'hunter');
+    w.join('Оксана', 'f', 'maker');
+    w.online('p1');
+    w.online('p2');
+    const supper = content.scenes.find((s) => s.pool && s.once === false)!;
+    const story = content.scenes.find((s) => !s.pool && s.nodes[s.start]!.type !== 'combat')!;
+    const g1 = w.g();
+    g1.startScene(supper.id);
+    expect(w.view('p1').scene?.mood).toBe('hearth');
+    w.state.scene = null;
+    w.g().startScene(story.id);
+    expect(w.view('p1').scene?.mood).toBe('story');
+  });
+
   it('every action has its own sound', () => {
     const missing = content.actions.filter((a) => !content.ambient!.actions[a.id]).map((a) => a.id);
     expect(missing).toEqual([]);

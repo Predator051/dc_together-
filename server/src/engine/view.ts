@@ -2,6 +2,7 @@ import type { ActionDef, ChoiceNode, Effect, PlayerId, PoolActionDef, SceneDef }
 import type {
   ClueView,
   CostView,
+  DeltaItem,
   EntryView,
   GainView,
   GroupView,
@@ -11,6 +12,8 @@ import type {
   PlayerView,
   SceneBlock,
   SceneView,
+  SummaryView,
+  WelcomeView,
 } from '../../../shared/src/protocol.js';
 import type { Game } from './index.js';
 import { resolveParas } from './text.js';
@@ -233,6 +236,7 @@ function sceneView(g: Game, pid: PlayerId): SceneView | null {
     pausedText: sc.paused ? g.render(g.ix.ui('scene_paused'), pid) : undefined,
     blocks,
     kind: n.type === 'choice' ? 'choice' : n.type === 'combat' ? 'combat' : 'text',
+    mood: n.type === 'combat' ? 'fight' : def.pool ? 'hearth' : 'story',
     partnerPicked: false,
     waiting: false,
   };
@@ -457,5 +461,62 @@ export function buildView(g: Game, pid: PlayerId): PlayerView {
           Math.round((g.ix.actions.get(me.busy.action)?.cooldown ?? 0) * g.cooldownMult(g.ix.areaOf(g.ix.actions.get(me.busy.action)?.group)))
         : 0,
     busyAction: me.busy && me.busy.until > g.now ? me.busy.action : null,
+    welcome: welcomeView(g, pid),
+    summary: summaryView(g, pid),
+    dayAt: g.s.meta.dayAt,
+  };
+}
+
+function visibleDelta(g: Game, before: Record<string, number>, after: Record<string, number>): DeltaItem[] {
+  const out: DeltaItem[] = [];
+  for (const r of g.ix.c.resources) {
+    if (r.hidden || r.kind === 'tool') continue;
+    const n = (after[r.id] ?? 0) - (before[r.id] ?? 0);
+    if (n !== 0) out.push({ id: r.id, name: r.name, n });
+  }
+  return out;
+}
+
+function welcomeView(g: Game, pid: PlayerId): WelcomeView | null {
+  const w = g.p(pid).welcome;
+  if (!w) return null;
+  const other = g.other(pid);
+  const lines = g.s.log
+    .filter((e) => e.id >= w.log && e.actor === other && e.text[pid])
+    .map((e) => e.text[pid]!)
+    .slice(-8);
+  const clues = Object.values(g.s.clues).filter((c) => c.at > w.at && c.who.includes(pid)).length;
+  const view = { days: g.s.meta.day - w.day, res: visibleDelta(g, w.res, g.s.res), lines, clues };
+  return view.days || view.res.length || view.lines.length || view.clues ? view : null;
+}
+
+function summaryView(g: Game, pid: PlayerId): SummaryView | null {
+  const act = g.s.meta.actDone;
+  if (act <= g.p(pid).seenSummary) return null;
+  const f = Object.keys(g.s.flags);
+  const other = g.other(pid);
+  const pool = new Set(g.ix.c.scenes.filter((s) => s.pool).map((s) => s.id));
+  const clues = Object.entries(g.s.clues);
+  const gathered = Object.entries(g.s.stats.gathered)
+    .map(([id, n]) => ({ id, name: g.ix.res.get(id)?.name ?? id, n, def: g.ix.res.get(id) }))
+    .filter((x) => x.def && !x.def.hidden && x.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 6)
+    .map(({ id, name, n }) => ({ id, name, n }));
+  return {
+    act,
+    days: g.s.meta.day,
+    places: f.filter((k) => k.startsWith('seen:')).length,
+    clues: clues.length,
+    cluesMine: clues.filter(([id, c]) => c.who.includes(pid) && g.ix.clues.get(id)?.to !== 'both').length,
+    solved: Object.values(g.s.mysteries).filter((lv) => lv >= 4).length,
+    people: Object.values(g.s.npcs).filter((n) => n.met).length,
+    scenes: f.filter((k) => k.startsWith('done:') && !pool.has(k.slice(5))).length,
+    suppers: g.s.stats.suppers,
+    fights: g.ix.c.encounters.filter((e) => g.flag(`${e.id}:killed`) || g.flag(`${e.id}:fled`)).length,
+    crafted: g.s.stats.crafted,
+    trips: g.s.stats.trips,
+    actions: { me: g.s.stats.actions[pid] ?? 0, partner: g.s.stats.actions[other] ?? 0 },
+    gathered,
   };
 }

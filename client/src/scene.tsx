@@ -44,7 +44,7 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
 
   return (
     <div class="scene-wrap">
-      <div class="scene">
+      <div class={`scene mood-${sc.mood}`}>
         <header class="scene-head">
           <h2>{sc.title}</h2>
           {sc.paused && (

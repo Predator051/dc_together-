@@ -19,6 +19,21 @@ export const migrations: Record<number, Migration> = {
     s.version = 2;
     return s;
   },
+  // v2 -> v3: return summaries, end-of-act summaries, evenings. Counting starts now;
+  // the summary of an act that is already over is still shown once.
+  2: (s) => {
+    for (const pid of ['p1', 'p2']) {
+      const p = s.players?.[pid];
+      if (!p) continue;
+      p.away ??= null;
+      p.welcome ??= null;
+      p.seenSummary ??= 0;
+    }
+    s.stats ??= { gathered: {}, actions: { p1: 0, p2: 0 }, crafted: 0, trips: 0, suppers: 0 };
+    s.meta.dayAt ??= s.meta.lastTick ?? s.meta.createdAt ?? 0;
+    s.version = 3;
+    return s;
+  },
 };
 
 export class MigrationError extends Error {}

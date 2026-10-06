@@ -1,6 +1,6 @@
 import type { Gender, PlayerId, Role, LogKind } from './content.js';
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 export interface PlayerState {
   id: PlayerId;
@@ -18,6 +18,29 @@ export interface PlayerState {
   /** Runtime only; reset to false on load. */
   online: boolean;
   lastSeen: number;
+  /** What the world looked like when this player left (v3). */
+  away: Snapshot | null;
+  /** Shown once on return after a real absence: "while you were away" (v3). */
+  welcome: Snapshot | null;
+  /** The last act whose summary this player has closed (v3). */
+  seenSummary: number;
+}
+
+export interface Snapshot {
+  at: number;
+  day: number;
+  res: Record<string, number>;
+  /** First log id written after the snapshot. */
+  log: number;
+}
+
+/** Counters for the end-of-act summary (v3; worlds older than that start counting at the update). */
+export interface Stats {
+  gathered: Record<string, number>;
+  actions: Record<PlayerId, number>;
+  crafted: number;
+  trips: number;
+  suppers: number;
 }
 
 export interface CombatState {
@@ -72,6 +95,8 @@ export interface WorldState {
     act: number;
     nextLogId: number;
     actDone: number;
+    /** Real time when the current day began (v3): evening falls as it gets long. */
+    dayAt: number;
   };
   players: Record<PlayerId, PlayerState>;
   res: Record<string, number>;
@@ -86,4 +111,5 @@ export interface WorldState {
   mysteries: Record<string, number>;
   npcs: Record<string, { met: boolean; rel: number }>;
   goal: string | null;
+  stats: Stats;
 }

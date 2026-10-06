@@ -1,7 +1,7 @@
 // Visual ambience: weather behind the page, fire glow, and a small accent while an action runs.
 // Purely decorative: hidden from screen readers, ignores input, stops when the tab is hidden,
 // and does not animate at all for people who ask for reduced motion.
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AmbientView } from '../../shared/src/protocol.js';
 import { sound } from './sound.js';
 
@@ -403,7 +403,31 @@ function reducedMotion(): boolean {
   }
 }
 
-export function Ambient({ a, paused }: { a: AmbientView; paused: boolean }) {
+/** How far into the evening a long day has drawn: 0 by day, up to ~0.85 late on. */
+function duskOf(dayAt: number, now: number): number {
+  const mins = (now - dayAt) / 60000;
+  return Math.max(0, Math.min(0.85, (mins - 25) / 35));
+}
+
+export function Ambient({
+  a,
+  paused,
+  mood,
+  dayAt,
+  offset,
+}: {
+  a: AmbientView;
+  paused: boolean;
+  mood: 'hearth' | 'fight' | 'story' | null;
+  dayAt: number;
+  offset: number;
+}) {
+  const [now, setNow] = useState(() => Date.now() + offset);
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now() + offset), 30_000);
+    return () => window.clearInterval(id);
+  }, [offset]);
+  const dusk = a.kind === 'cellar' || a.kind === 'candle' ? 0 : duskOf(dayAt, now);
   const backRef = useRef<HTMLCanvasElement>(null);
   const frontRef = useRef<HTMLCanvasElement>(null);
   const engine = useRef<Engine | null>(null);
@@ -419,14 +443,15 @@ export function Ambient({ a, paused }: { a: AmbientView; paused: boolean }) {
 
   useEffect(() => {
     engine.current?.set({ ...a, paused });
-    sound.set({ ...a, scene: paused });
-  }, [a.kind, a.fire, a.fx, a.partnerFx, paused]);
+    sound.set({ ...a, scene: paused, mood, dusk });
+  }, [a.kind, a.fire, a.fx, a.partnerFx, paused, mood, Math.round(dusk * 10)]);
 
   return (
     <>
       <div class={`amb amb-${a.kind} fire-${a.fire} ${a.fx === 'fire' || a.partnerFx === 'fire' ? 'stoking' : ''}`} aria-hidden="true">
         <div class="amb-glow" />
         <div class="amb-edge" />
+        <div class="amb-dusk" style={{ opacity: String(dusk) }} />
       </div>
       {!still && <canvas ref={backRef} class="amb-canvas back" aria-hidden="true" />}
       {!still && <canvas ref={frontRef} class="amb-canvas front" aria-hidden="true" />}

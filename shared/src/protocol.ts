@@ -8,7 +8,9 @@ export type Command =
   | { c: 'decline' }
   | { c: 'cancel' }
   | { c: 'next' }
-  | { c: 'choose'; id: string };
+  | { c: 'choose'; id: string }
+  /** Close a one-time panel: the return summary or the end-of-act summary. */
+  | { c: 'ack'; what: 'welcome' | 'summary' };
 
 export type ClientMsg =
   | { t: 'hello'; token: string }
@@ -146,6 +148,8 @@ export interface SceneBlock {
 export interface SceneView {
   id: string;
   title: string;
+  /** Sound and light of the scene: by the fire, a fight, or the story itself. */
+  mood: 'hearth' | 'fight' | 'story';
   paused: boolean;
   pausedText?: string;
   blocks: SceneBlock[];
@@ -227,6 +231,33 @@ export interface AmbientView {
   partnerFxUntil: number;
 }
 
+/** "While you were away": what changed since this player left. */
+export interface WelcomeView {
+  days: number;
+  res: DeltaItem[];
+  /** The partner's own log lines from that time, oldest first. */
+  lines: string[];
+  clues: number;
+}
+
+/** End-of-act summary: numbers only, no story. */
+export interface SummaryView {
+  act: number;
+  days: number;
+  places: number;
+  clues: number;
+  cluesMine: number;
+  solved: number;
+  people: number;
+  scenes: number;
+  suppers: number;
+  fights: number;
+  crafted: number;
+  trips: number;
+  actions: { me: number; partner: number };
+  gathered: DeltaItem[];
+}
+
 export interface PlayerView {
   now: number;
   me: MeView;
@@ -245,6 +276,10 @@ export interface PlayerView {
   log: LogView[];
   journal: { clues: ClueView[]; questions: QuestionView[]; people: PersonView[] };
   actDone: { act: number; text: string } | null;
+  welcome: WelcomeView | null;
+  summary: SummaryView | null;
+  /** Server time when the current day began: evening falls as it gets long. */
+  dayAt: number;
   /** Busy state of this player: all routine actions wait until then. */
   busyUntil: number;
   busyFrom: number;
