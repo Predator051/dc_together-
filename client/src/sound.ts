@@ -81,7 +81,7 @@ interface Bed {
   stop: () => void;
 }
 
-type Mood = 'hearth' | 'fight' | 'story' | null;
+type Mood = 'hearth' | 'fight' | 'story' | 'deep' | null;
 type SoundState = AmbientView & { scene: boolean; mood: Mood; dusk: number };
 
 class Sound {
@@ -589,6 +589,20 @@ class Sound {
       n.connect(bp).connect(g2).connect(out);
       n.start();
       nodes.push(n, this.lfo(bp.frequency, 0.13, 350));
+    } else if (mood === 'deep') {
+      // under the mountain: the hum in the bones, slow and close
+      for (const [f, l, r] of [
+        [41, 0.08, 0.11],
+        [61.5, 0.035, 0.07],
+      ] as const) {
+        const o = ctx.createOscillator();
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = l;
+        o.connect(g).connect(out);
+        o.start();
+        nodes.push(o, this.lfo(g.gain, r, l * 0.7));
+      }
     } else {
       pad([73.4, 110], 0.014, 500); // D and A, barely there
     }

@@ -335,6 +335,8 @@ function validCommand(cmd: unknown): Command | null {
     case 'cancel':
     case 'next':
       return { c: c.c } as Command;
+    case 'sign':
+      return typeof c.id === 'string' && c.id.length < 16 ? { c: 'sign', id: c.id } : null;
     case 'ack': {
       const what = (cmd as { what?: unknown }).what;
       return what === 'welcome' || what === 'summary' ? { c: 'ack', what } : null;

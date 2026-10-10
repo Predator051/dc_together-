@@ -128,6 +128,28 @@ export const T = {
   notifyBack: 'знову в грі',
   notifyDone: 'Готово',
   notifyScene: 'Починається',
+
+  delveLight: 'Світло',
+  delveWays: 'Куди далі',
+  delveWants: 'хоче сюди',
+  delveLeave: 'Повернутися назад',
+  stealthAlarm: 'Тривога',
+  stealthTime: 'Затички тримають',
+  stealthStep: 'Крок',
+  stealthSneak: 'Крадькома',
+  stealthSneakHint: 'тихо, але вдвічі довше',
+  stealthFreeze: 'Завмерти',
+  stealthNow: 'Зараз:',
+  stealthNext: 'Далі:',
+  stealthEnd: 'вівтар',
+  signsTitle: 'Знаки',
+  signsHint: 'Покажіть знак напарникові.',
+  signShows: 'показує',
+  signStop: 'Стій',
+  signGo: 'Іди',
+  signQuiet: 'Тихо',
+  signDanger: 'Небезпека',
+  signHere: 'Сюди',
 };
 
 export type Strings = typeof T;

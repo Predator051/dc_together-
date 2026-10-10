@@ -1780,6 +1780,350 @@ mark {
   color: var(--gall);
 }
 
+/* ---------- shared work: a bar under the place's name ---------- */
+.work {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  color: var(--faded);
+}
+.work-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(230, 217, 188, 0.08);
+  overflow: hidden;
+}
+.work-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ochre);
+  transition: width 0.5s ease;
+}
+.work b {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.work.done .work-bar > span {
+  background: var(--verdigris);
+}
+
+/* ---------- underground: the map, the light, the ways ---------- */
+.delve-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.delve-map-name {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--pale);
+}
+.delve-room {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+.light {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 150px;
+  flex: 0 1 220px;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ochre-ink);
+}
+.light-label {
+  color: var(--faded);
+}
+.light-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(230, 217, 188, 0.08);
+  overflow: hidden;
+}
+.light-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b8742c, var(--ochre-ink));
+  box-shadow: 0 0 10px rgba(221, 184, 103, 0.5);
+  transition: width 0.5s ease;
+}
+.light.low {
+  color: var(--cinnabar-ink);
+}
+.light.low .light-bar > span {
+  background: var(--cinnabar);
+  animation: flicker 1.2s ease-in-out infinite alternate;
+}
+.dmap {
+  display: block;
+  width: 100%;
+  margin: 4px auto 14px;
+  max-height: 260px;
+}
+.dlink {
+  stroke: var(--rule-2);
+  stroke-width: 2;
+}
+.dlink.unknown {
+  stroke-dasharray: 3 4;
+}
+.droom circle {
+  fill: var(--leaf-2);
+  stroke: var(--faded);
+  stroke-width: 1.5;
+}
+.droom.unknown circle {
+  fill: none;
+  stroke: var(--pale);
+  stroke-dasharray: 2 3;
+}
+.droom text {
+  fill: var(--pale);
+  font-family: var(--sans);
+  font-size: 11px;
+}
+.droom.here circle {
+  fill: var(--ochre);
+  stroke: var(--ochre-ink);
+}
+.droom .dglow {
+  fill: rgba(221, 184, 103, 0.14) !important;
+  stroke: none !important;
+}
+.delve-lines {
+  margin: 10px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--cinnabar);
+}
+.delve-lines p {
+  margin: 0 0 4px;
+  font-size: 0.98rem;
+  color: var(--ink-2);
+}
+.delve-foot h3 {
+  margin-bottom: 8px;
+}
+.way-note {
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: 0.84rem;
+  color: var(--faded);
+}
+.way-note.lead {
+  color: var(--verdigris);
+}
+.way-note.warn {
+  color: var(--cinnabar-ink);
+}
+.way-partner {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--gall);
+}
+.opt.way.theirs {
+  border-color: rgba(142, 165, 179, 0.6);
+}
+.way-cost {
+  flex: none;
+  min-width: 26px;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ochre-ink);
+}
+.delve-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.delve-acts .btn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+.act-gives {
+  font-size: 0.8rem;
+  color: var(--verdigris);
+}
+.act-cost {
+  font-size: 0.8rem;
+  color: var(--ochre-ink);
+}
+.leave {
+  margin-top: 10px;
+}
+
+/* ---------- past the watchers ---------- */
+.track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 14px;
+}
+.tile-s {
+  position: relative;
+  flex: 1;
+  height: 26px;
+  border-radius: 4px;
+  border: 1px solid var(--rule-2);
+  background: rgba(230, 217, 188, 0.05);
+}
+.tile-s.past {
+  opacity: 0.35;
+}
+.tile-s.loose {
+  background: repeating-linear-gradient(45deg, rgba(230, 217, 188, 0.12) 0 3px, transparent 3px 7px);
+  border-style: dashed;
+}
+.tile-s.here {
+  border-color: var(--ochre);
+}
+.party {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--ochre-ink);
+  box-shadow: 0 0 10px rgba(221, 184, 103, 0.7);
+}
+.track-end {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--pale);
+}
+.smeters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-bottom: 12px;
+}
+.smeter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--faded);
+}
+.pips {
+  display: flex;
+  gap: 3px;
+}
+.pips > span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--rule-2);
+}
+.smeter.alarm .pips > span.on {
+  background: var(--cinnabar);
+  border-color: var(--cinnabar);
+}
+.smeter.time .pips > span.on {
+  background: var(--ochre);
+  border-color: var(--ochre);
+}
+.perceive {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(217, 184, 120, 0.07);
+  border: 1px solid rgba(217, 184, 120, 0.2);
+}
+.perceive p {
+  margin: 0 0 4px;
+  font-style: italic;
+  color: #e8d3a4;
+}
+.perceive-key {
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--cinnabar-ink);
+}
+
+/* ---------- hand signs ---------- */
+.signs {
+  margin-bottom: 10px;
+}
+.sign-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 6px;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  color: var(--ink-2);
+}
+.sign-in.fresh {
+  color: var(--gall);
+}
+.sign-in.fresh .sign-glyph {
+  animation: sheet 0.3s ease both;
+}
+.sign-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.sign {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-2);
+  background: var(--leaf);
+  color: var(--ink-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sign.on {
+  border-color: var(--ochre);
+  background: var(--ochre-wash);
+}
+.sign-glyph {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.sign-label {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+}
+.moves {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.moves .opt {
+  justify-content: center;
+  text-align: center;
+  min-height: 58px;
+  padding: 8px;
+}
+.moves .opt-body {
+  align-items: center;
+}
+
 /* ---------- one-time sheets: "while you were away", end-of-act summary ---------- */
 .sheet-wrap {
   position: fixed;
@@ -2006,6 +2350,12 @@ mark {
 @media (max-width: 359px) {
   .ledger {
     grid-template-columns: 1fr;
+  }
+  .sign-label {
+    display: none;
+  }
+  .moves .opt .reason {
+    display: none;
   }
 }
 @media (min-width: 600px) and (max-width: 959px) {

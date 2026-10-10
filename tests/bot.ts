@@ -1,7 +1,7 @@
 // A bot player that only sees its own PlayerView and answers with Commands, exactly like a client.
 // It peeks into content definitions for heuristics (what an action yields), never into world state.
 
-import type { ActionDef, Content } from '../shared/src/content.js';
+import type { ActionDef, Cond, Content } from '../shared/src/content.js';
 import type { Command, EntryView, PlayerView } from '../shared/src/protocol.js';
 import { Rng } from '../shared/src/rng.js';
 
@@ -67,6 +67,8 @@ export class Bot {
   /** `now` is the current server time; defaults to the time the view was built. */
   decide(v: PlayerView, now: number = v.now): Command | null {
     const sc = v.scene;
+    if (sc && !sc.paused && sc.kind === 'delve' && sc.delve) return this.delve(v, sc.delve);
+    if (sc && !sc.paused && sc.kind === 'stealth' && sc.stealth) return this.stealth(v);
     if (sc && !sc.paused) {
       if (sc.waiting) return null;
       if (sc.kind === 'text') return { c: 'next' };
@@ -96,6 +98,10 @@ export class Bot {
     }
 
     const entries = v.groups.flatMap((g) => g.entries);
+    // Remember where the shared work is (a place with a progress bar still filling up).
+    const storyHere = v.groups.some((g) => g.progress && g.progress.n < g.progress.max);
+    if (storyHere) this.storyArea = v.me.area;
+    this.progressIds = new Set(v.groups.filter((g) => g.progress && g.progress.n < g.progress.max).flatMap((g) => g.entries.map((e) => e.id)));
 
     // Together scenes first (story), supper only occasionally or when nothing else is pending.
     const sig = this.signature(v);
@@ -138,6 +144,13 @@ export class Bot {
             if (toward) return { c: 'act', id: toward.id };
           }
         }
+        // Nothing to do for the story here: head back to where it is.
+        if (this.storyArea && this.storyArea !== v.me.area && !entries.some((e) => e.kind === 'scene') && !missing.length && this.rng.chance(0.3)) {
+          const order = this.content.areas.map((a) => a.id);
+          const dir = Math.sign(order.indexOf(this.storyArea) - order.indexOf(v.me.area));
+          const toward = travels.find((e) => Math.sign(order.indexOf(this.travelTo.get(e.id)!) - order.indexOf(v.me.area)) === dir);
+          if (toward) return { c: 'act', id: toward.id };
+        }
         if (this.rng.chance(0.01)) return { c: 'act', id: this.rng.pick(travels).id };
       }
     }
@@ -176,6 +189,53 @@ export class Bot {
     return null;
   }
 
+  /**
+   * Underground: follow the partner's pick; otherwise prefer ways not walked yet, avoid stone the
+   * maker sees as bad, take one-time finds, light a torch when the lamp runs low.
+   */
+  private delve(v: PlayerView, d: NonNullable<NonNullable<PlayerView['scene']>['delve']>): Command | null {
+    const act = (id: string) => d.acts.find((a) => a.id === `act:${id}` && a.enabled);
+    if (d.light <= 3 && act('torch')) return { c: 'choose', id: 'act:torch' };
+    const finds = d.acts.filter((a) => a.enabled && a.id !== 'act:torch');
+    if (finds.length) return { c: 'choose', id: finds[0]!.id };
+    const exits = d.exits.filter((e) => e.enabled);
+    const theirs = exits.find((e) => e.partner);
+    if (theirs) return theirs.mine ? null : { c: 'choose', id: theirs.id };
+    if (exits.some((e) => e.mine)) return null;
+    const unknown = exits.filter((e) => !e.known && e.tone !== 'warn');
+    const safe = exits.filter((e) => e.tone !== 'warn');
+    const pool = unknown.length ? unknown : safe.length ? safe : exits;
+    const lead = pool.filter((e) => e.tone === 'lead');
+    const choice = this.rng.pick(lead.length && this.rng.chance(0.6) ? lead : pool);
+    return choice ? { c: 'choose', id: choice.id } : null;
+  }
+
+  /**
+   * Past the watchers: show a sign first (the hunter "stop"/"go" by the watchers, the maker
+   * "quiet"/"go" by the stones), then move by both what you see and what your partner showed.
+   */
+  private stealth(v: PlayerView): Command | null {
+    const st = v.scene!.stealth!;
+    if (st.myPick) return null;
+    const watching = !!st.look?.now;
+    const loose = v.me.role === 'maker' && !!st.loose?.[st.pos];
+    const mine = v.me.role === 'hunter' ? (watching ? 'stop' : 'go') : loose ? 'quiet' : 'go';
+    const signs = v.scene!.signs;
+    if (!signs?.mine || signs.mine !== mine || !this.signedThisTurn(st.pos, st.time)) {
+      this.lastSign = `${st.pos}:${st.time}`;
+      return { c: 'sign', id: mine };
+    }
+    if (!signs.fresh) return null; // wait for the partner's sign this turn
+    const stop = watching || signs.partner === 'stop';
+    const quiet = loose || signs.partner === 'quiet';
+    return { c: 'choose', id: stop ? 'freeze' : quiet ? 'sneak' : 'step' };
+  }
+
+  private lastSign = '';
+  private signedThisTurn(pos: number, time: number): boolean {
+    return this.lastSign === `${pos}:${time}`;
+  }
+
   private signature(v: PlayerView): string {
     const res = v.res.map((r) => `${r.id}:${Math.min(r.n, 5)}`).join(',');
     return `${v.day}|${v.journal.clues.length}|${res}`;
@@ -190,6 +250,12 @@ export class Bot {
       }
     }
     const res = (id: string) => v.res.find((r) => r.id === id)?.n ?? 0;
+    // Tools that a blocked action or scene needs (an axe, a lamp, a pick…).
+    for (const e of entries) {
+      if (e.enabled) continue;
+      const def = this.actions.get(e.id) ?? this.content.scenes.find((x) => x.id === e.id);
+      for (const [r, n] of resConds(def?.enabled)) if (res(r) < n) w.set(r, Math.max(w.get(r) ?? 0, n - res(r)));
+    }
     if (res('res_03') < 6) w.set('res_03', Math.max(w.get('res_03') ?? 0, 6 - res('res_03')));
     if (res('res_02') < 3) w.set('res_02', Math.max(w.get('res_02') ?? 0, 3 - res('res_02')));
     if (res('res_01') < 6) w.set('res_01', Math.max(w.get('res_01') ?? 0, 6 - res('res_01')));
@@ -199,10 +265,15 @@ export class Bot {
     return w;
   }
 
+  private storyArea: string | null = null;
+  private progressIds = new Set<string>();
+
   private score(v: PlayerView, e: EntryView, wanted: Map<string, number>): number {
     const a = this.actions.get(e.id);
     if (!a) return 0;
     let s = 1 + this.rng.next();
+    // Shared work in progress moves the story.
+    if (this.progressIds.has(e.id)) s += 25;
     if (a.once || a.oncePerPlayer) s += 100;
     // Unknown outcome ("+?") with one-time vignettes is worth exploring.
     if (a.beats?.length && e.gain?.some((x) => x.text === '+?')) s += 45;
@@ -222,4 +293,13 @@ export class Bot {
     if (a.id === 'act_09') s -= 5;
     return s;
   }
+}
+
+/** Resource thresholds a condition asks for (`res ≥ n`), looking through all/any. */
+function resConds(c: Cond | undefined): Array<[string, number]> {
+  if (!c) return [];
+  if ('all' in c) return c.all.flatMap(resConds);
+  if ('any' in c) return c.any.flatMap(resConds);
+  if ('res' in c && c.gte !== undefined && c.gte > 0) return [[c.res, c.gte]];
+  return [];
 }

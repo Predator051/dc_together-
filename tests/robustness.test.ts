@@ -6,7 +6,7 @@ import type { Content } from '../shared/src/content.js';
 import { validateContent } from '../server/src/validate.js';
 import { autoplay, describe as dump, type World } from './harness.js';
 
-const finished = (w: World) => !!w.state.flags['a3_done'] && !w.state.scene;
+const finished = (w: World) => !!w.state.flags['a4_done'] && !w.state.scene;
 const doneScenes = (w: World) => Object.keys(w.state.flags).filter((f) => f.startsWith('done:')).length;
 const calm = (w: World) => !w.state.scene && !w.state.proposal;
 
@@ -35,7 +35,7 @@ describe('careless players never get stuck', () => {
       const r = autoplay(
         { choice: 'random', combat: 'smart', seed: 300 + i, ...c.a },
         { choice: 'random', combat: 'smart', seed: 400 + i, ...c.b },
-        { seed: 50 + i, maxSteps: 60000 },
+        { seed: 50 + i, maxSteps: 120000 },
       );
       if (!r.done) throw new Error(`Stuck (${r.reason}) after ${r.steps} steps:\n${dump(r.world)}`);
       expect(finished(r.world)).toBe(true);
@@ -67,7 +67,7 @@ describe('the game recovers from empty stores at any point', () => {
         const after = autoplay(
           { choice: 'random', combat: 'smart', seed: 700 + k },
           { choice: 'random', combat: 'weak', seed: 800 + k },
-          { from: w, maxSteps: 60000 },
+          { from: w, maxSteps: 120000 },
         );
         if (!after.done)
           throw new Error(`Stuck after emptying ${emptied.join(', ')} at ${k} scenes (${after.reason}):\n${dump(after.world)}`);

@@ -65,6 +65,32 @@ export interface SceneState {
   trail: Array<{ node: string; picks?: Partial<Record<PlayerId, string>>; combat?: Record<PlayerId, string[]> }>;
   combat: CombatState | null;
   startedAt: number;
+  /** A descent in progress (kept while the scene steps out for a story beat and comes back). */
+  delve?: DelveState | null;
+  stealth?: StealthState | null;
+  /** The last hand sign each player showed (in earplugs nobody hears anybody). */
+  signs?: Partial<Record<PlayerId, { id: string; at: number; turn: number }>>;
+}
+
+export interface DelveState {
+  map: string;
+  node: string;
+  room: string;
+  light: number;
+  lightMax: number;
+  /** Way each player wants to go: `go:<room>`. */
+  picks: Partial<Record<PlayerId, string>>;
+  /** What happened last, per player. */
+  lines: Record<PlayerId, string[]>;
+}
+
+export interface StealthState {
+  pos: number;
+  turn: number;
+  time: number;
+  alarm: number;
+  picks: Partial<Record<PlayerId, string>>;
+  lines: Record<PlayerId, string[]>;
 }
 
 export interface Proposal {

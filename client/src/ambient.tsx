@@ -418,7 +418,7 @@ export function Ambient({
 }: {
   a: AmbientView;
   paused: boolean;
-  mood: 'hearth' | 'fight' | 'story' | null;
+  mood: 'hearth' | 'fight' | 'story' | 'deep' | null;
   dayAt: number;
   offset: number;
 }) {

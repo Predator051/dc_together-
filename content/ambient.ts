@@ -96,5 +96,15 @@ export const ambient: AmbientDef = {
     act_53: 'build',
     act_43: 'rubble',
     act_28: 'sift',
+    // act 4: light, tools, the old passage, the shaft
+    act_80: 'steam',
+    act_88: 'steam',
+    act_81: 'steam',
+    act_82: 'forge',
+    act_83: 'forge',
+    act_84: 'rubble',
+    act_85: 'trade',
+    act_86: 'build',
+    act_87: 'rubble',
   },
 };

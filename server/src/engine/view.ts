@@ -1,8 +1,11 @@
-import type { ActionDef, ChoiceNode, Effect, PlayerId, PoolActionDef, SceneDef } from '../../../shared/src/content.js';
+import type { ActionDef, ChoiceNode, DelveNode, Effect, PlayerId, PoolActionDef, SceneDef, StealthNode } from '../../../shared/src/content.js';
 import type {
   ClueView,
   CostView,
   DeltaItem,
+  DelveRoomView,
+  DelveView,
+  StealthView,
   EntryView,
   GainView,
   GroupView,
@@ -151,7 +154,18 @@ function groups(g: Game, pid: PlayerId): GroupView[] {
       });
     }
     const partner = mateEntries(g, pid, loc.id);
-    out.push({ id: loc.id, name: loc.name, desc: g.render(loc.desc, pid), base: !!loc.base, entries, ...(partner.length ? { partner } : {}) });
+    const progress = loc.progress
+      ? { label: loc.progress.label, n: Math.min(loc.progress.max, g.flag(loc.progress.flag)), max: loc.progress.max }
+      : undefined;
+    out.push({
+      id: loc.id,
+      name: loc.name,
+      desc: g.render(loc.desc, pid),
+      base: !!loc.base,
+      entries,
+      ...(partner.length ? { partner } : {}),
+      ...(progress ? { progress } : {}),
+    });
   }
   return out;
 }
@@ -235,8 +249,8 @@ function sceneView(g: Game, pid: PlayerId): SceneView | null {
     paused: sc.paused,
     pausedText: sc.paused ? g.render(g.ix.ui('scene_paused'), pid) : undefined,
     blocks,
-    kind: n.type === 'choice' ? 'choice' : n.type === 'combat' ? 'combat' : 'text',
-    mood: n.type === 'combat' ? 'fight' : def.pool ? 'hearth' : 'story',
+    kind: n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth' ? n.type : 'text',
+    mood: n.type === 'combat' ? 'fight' : n.type === 'delve' || n.type === 'stealth' ? 'deep' : def.pool ? 'hearth' : 'story',
     partnerPicked: false,
     waiting: false,
   };
@@ -293,13 +307,138 @@ function sceneView(g: Game, pid: PlayerId): SceneView | null {
       fearMax: enc.enemy.fear,
       round: cb.round,
       lastRound: cb.lastRound[pid] ?? [],
+      ...(enc.bars?.hp ? { hpLabel: enc.bars.hp } : {}),
+      ...(enc.bars?.fear ? { fearLabel: enc.bars.fear } : {}),
     };
+  } else if (n.type === 'delve' && sc.delve) {
+    view.delve = delveView(g, pid, n);
+    const d = sc.delve;
+    view.myPick = d.picks[pid];
+    view.partnerPicked = !!d.picks[other];
+  } else if (n.type === 'stealth' && sc.stealth) {
+    view.stealth = stealthView(g, pid, n);
   } else {
-    view.button = n.type !== 'combat' && n.button ? g.render(n.button, pid) : undefined;
+    view.button = n.type !== 'combat' && 'button' in n && n.button ? g.render(n.button, pid) : undefined;
     if (sc.ready[pid]) {
       view.waiting = true;
       view.waitingText = g.render(g.ix.ui('wait_read'), pid);
     }
+  }
+  const signs = sc.signs ?? {};
+  if (n.type === 'stealth' || signs[pid] || signs[other]) {
+    const theirs = signs[other];
+    view.signs = {
+      mine: signs[pid]?.id,
+      partner: theirs?.id,
+      // a sign counts as fresh during the turn it was shown (or for half a minute outside turns)
+      fresh: !!theirs && (sc.stealth ? theirs.turn === sc.stealth.turn : g.now - theirs.at < 30_000),
+    };
+  }
+  return view;
+}
+
+function delveView(g: Game, pid: PlayerId, n: DelveNode): DelveView {
+  const d = g.s.scene!.delve!;
+  const map = g.ix.maps.get(d.map)!;
+  const room = map.rooms[d.room]!;
+  const role = g.p(pid).role;
+  const other = g.other(pid);
+  const known = (id: string) => !!g.flag(`known:${map.id}:${id}`);
+  const rooms: DelveRoomView[] = [];
+  const links: Array<[string, string]> = [];
+  const shown = new Set<string>();
+  const show = (id: string, unknown: boolean) => {
+    if (shown.has(id)) return;
+    shown.add(id);
+    const r = map.rooms[id]!;
+    rooms.push({ id, name: unknown ? '?' : r.name, x: r.pos[0], y: r.pos[1], here: id === d.room, unknown });
+  };
+  for (const [id, r] of Object.entries(map.rooms)) {
+    if (!known(id)) continue;
+    show(id, false);
+    for (const e of r.exits) {
+      if (!g.delveExitVisible(e)) continue;
+      // a known room shows where its ways lead, even if nobody went there yet
+      show(e.to, !known(e.to));
+      if (id < e.to || !known(e.to)) links.push([id, e.to]);
+    }
+  }
+  const exits = room.exits
+    .filter((e) => g.delveExitVisible(e))
+    .map((e) => {
+      const note = role === 'hunter' ? e.hunter : role === 'maker' ? e.maker : undefined;
+      const tone: 'warn' | 'lead' | undefined = role === 'maker' && e.risk ? 'warn' : role === 'hunter' && e.draft ? 'lead' : undefined;
+      const enabled = !e.enabled || g.test(e.enabled, pid);
+      return {
+        id: `go:${e.to}`,
+        to: e.to,
+        label: g.render(e.label, pid),
+        light: e.light ?? 1,
+        ...(note ? { note: g.render(note, pid) } : {}),
+        ...(tone ? { tone } : {}),
+        enabled,
+        ...(!enabled ? { reason: e.disabledHint ? g.render(e.disabledHint, pid) : g.ix.ui('err_not_now') } : {}),
+        mine: d.picks[pid] === `go:${e.to}`,
+        partner: d.picks[other] === `go:${e.to}`,
+        known: known(e.to),
+      };
+    });
+  const acts = (room.acts ?? [])
+    .filter((a) => g.delveActVisible(map, a, pid))
+    .map((a) => {
+      const block = g.delveActBlock(a, pid);
+      return {
+        id: `act:${a.id}`,
+        label: g.render(a.label, pid),
+        light: a.light ?? 0,
+        enabled: block === null,
+        ...(block ? { reason: block } : {}),
+        ...(a.gives ? { gives: g.render(a.gives, pid) } : {}),
+      };
+    });
+  return {
+    map: map.name,
+    room: room.name,
+    text: paras(g, room.text, pid),
+    own: role === 'hunter' ? paras(g, room.hunter, pid) : role === 'maker' ? paras(g, room.maker, pid) : [],
+    light: Math.max(0, d.light),
+    lightMax: d.lightMax,
+    rooms,
+    links,
+    exits,
+    acts,
+    canLeave: d.room === g.delveStart(map, n),
+    lines: d.lines[pid] ?? [],
+  };
+}
+
+function stealthView(g: Game, pid: PlayerId, n: StealthNode): StealthView {
+  const st = g.s.scene!.stealth!;
+  const role = g.p(pid).role;
+  const lim = g.stealthLimits(n);
+  const other = g.other(pid);
+  const view: StealthView = {
+    pos: st.pos,
+    length: n.path.length,
+    alarm: st.alarm,
+    alarmMax: lim.alarm,
+    time: st.time,
+    timeMax: lim.time,
+    ...(st.picks[pid] ? { myPick: st.picks[pid] } : {}),
+    partnerPicked: !!st.picks[other],
+    lines: st.lines[pid] ?? [],
+  };
+  if (role === 'hunter') {
+    const look = (t: number) => g.render(n.watch[t % n.watch.length] ? n.sees.watching : n.sees.away, pid);
+    view.now = look(st.turn);
+    view.next = look(st.turn + 1);
+    view.look = { now: !!n.watch[st.turn % n.watch.length], next: !!n.watch[(st.turn + 1) % n.watch.length] };
+  } else if (role === 'maker') {
+    const stone = (i: number) => (i < n.path.length ? g.render(n.path[i] ? n.sees.loose : n.sees.firm, pid) : undefined);
+    view.now = stone(st.pos);
+    const nx = stone(st.pos + 1);
+    if (nx) view.next = nx;
+    view.loose = n.path.map((x: boolean, i: number) => (i >= st.pos ? x : false));
   }
   return view;
 }

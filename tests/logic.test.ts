@@ -329,7 +329,9 @@ describe('end-of-act banner', () => {
     w.state.meta.actDone = 2;
     expect(w.view('p1').actDone).toBeNull();
     w.state.meta.actDone = 3;
-    expect(w.view('p1').actDone?.act).toBe(3);
+    expect(w.view('p1').actDone).toBeNull();
+    w.state.meta.actDone = 4;
+    expect(w.view('p1').actDone?.act).toBe(4);
   });
 });
 

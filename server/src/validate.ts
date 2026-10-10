@@ -10,6 +10,7 @@ import type {
   Paras,
   SceneDef,
   SceneNode,
+  DelveMapDef,
   Text,
   TextVariant,
 } from '../../shared/src/content.js';
@@ -59,14 +60,26 @@ function logConds(l: LogText | undefined, out: Cond[]): void {
   }
 }
 
+let MAPS = new Map<string, DelveMapDef>();
+
 function nodeTargets(n: SceneNode): Array<string | null | undefined> {
   if (n.type === 'choice') return [...n.options.map((o) => o.next), n.mismatch, n.next];
   if (n.type === 'combat') return [n.win, n.lose];
+  if (n.type === 'stealth') return [n.win, n.lose];
+  if (n.type === 'delve') {
+    const beats = Object.values(MAPS.get(n.map)?.rooms ?? {}).flatMap((r) => (r.enter ?? []).map((e) => e.next));
+    return [n.out, n.dark, ...beats];
+  }
   return [n.next, ...(n.goto ?? []).map((g) => g.next)];
 }
 
 function nodeEffects(n: SceneNode): Effect[] {
   const list = [...(n.effects ?? [])];
+  if (n.type === 'delve')
+    for (const r of Object.values(MAPS.get(n.map)?.rooms ?? {})) {
+      list.push(...(r.first ?? []));
+      for (const a of r.acts ?? []) list.push(...(a.effects ?? []));
+    }
   if (n.type === 'choice') for (const o of n.options) list.push(...(o.effects ?? []));
   return effectsOf(list);
 }
@@ -91,6 +104,7 @@ export function validateContent(c: Content): Report {
   const errors: string[] = [];
   const warnings: string[] = [];
   const err = (m: string) => errors.push(m);
+  MAPS = new Map((c.maps ?? []).map((m) => [m.id, m]));
 
   // IDs
   const all = new Map<string, string>();
@@ -164,6 +178,13 @@ export function validateContent(c: Content): Report {
   for (const e of c.encounters) {
     written.add(`${e.id}:killed`);
     written.add(`${e.id}:fled`);
+  }
+  for (const m of c.maps ?? []) {
+    for (const [id, r] of Object.entries(m.rooms)) {
+      written.add(`known:${m.id}:${id}`);
+      written.add(`found:${m.id}:${id}`);
+      for (const a of r.acts ?? []) written.add(`dact:${m.id}:${a.id}`);
+    }
   }
 
   const checkCond = (where: string, cond: Cond | undefined) => {
@@ -334,6 +355,84 @@ export function validateContent(c: Content): Report {
     if (e.armor) checkCond(w, e.armor.if);
     if (!e.options.some((o) => !o.visible && !o.cost && (o.dmg || o.fear))) err(`${w}: needs an always-available attacking option`);
   }
+
+  // Underground maps
+  const usedMaps = new Set<string>();
+  for (const s of c.scenes) for (const n of Object.values(s.nodes)) if (n.type === 'delve') usedMaps.add(n.map);
+  for (const m of c.maps ?? []) {
+    const w = `map ${m.id}`;
+    if (!m.rooms[m.start]) err(`${w}: unknown start room ${m.start}`);
+    if (!usedMaps.has(m.id)) warnings.push(`${w}: no scene uses it`);
+    const seenRooms = new Set<string>([m.start]);
+    const stack = [m.start];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const e of m.rooms[id]?.exits ?? []) if (!seenRooms.has(e.to) && m.rooms[e.to]) (seenRooms.add(e.to), stack.push(e.to));
+    }
+    for (const [id, r] of Object.entries(m.rooms)) {
+      const rw = `${w}.${id}`;
+      if (!seenRooms.has(id)) err(`${rw}: cannot be reached from the start`);
+      const cs: Cond[] = [];
+      textConds(r.text, cs);
+      textConds(r.hunter, cs);
+      textConds(r.maker, cs);
+      cs.forEach((x) => checkCond(rw, x));
+      checkEffects(rw, effectsOf(r.first), true);
+      const actIds = new Set<string>();
+      for (const e of r.exits) {
+        if (!m.rooms[e.to]) err(`${rw}: exit to unknown room ${e.to}`);
+        if (e.to === id) err(`${rw}: exit to itself`);
+        checkCond(rw, e.visible);
+        checkCond(rw, e.enabled);
+        if (e.risk && (e.risk.p <= 0 || e.risk.p > 1)) err(`${rw}: bad risk ${e.risk.p}`);
+      }
+      for (const a of r.acts ?? []) {
+        if (actIds.has(a.id)) err(`${rw}: duplicate act ${a.id}`);
+        actIds.add(a.id);
+        checkCond(`${rw}.${a.id}`, a.visible);
+        checkCond(`${rw}.${a.id}`, a.enabled);
+        checkCost(`${rw}.${a.id}`, a.cost);
+        checkEffects(`${rw}.${a.id}`, effectsOf(a.effects), true);
+      }
+      for (const b of r.enter ?? []) checkCond(rw, b.if);
+    }
+  }
+  for (const s of c.scenes)
+    for (const [id, n] of Object.entries(s.nodes)) {
+      const nw = `scene ${s.id}.${id}`;
+      if (n.type === 'delve') {
+        const m = MAPS.get(n.map);
+        if (!m) {
+          err(`${nw}: unknown map ${n.map}`);
+          continue;
+        }
+        for (const st of n.starts ?? []) {
+          checkCond(nw, st.if);
+          if (!m.rooms[st.room]) err(`${nw}: unknown start room ${st.room}`);
+        }
+        for (const b of n.bonus ?? []) checkCond(nw, b.if);
+        if (n.light < 1) err(`${nw}: no light to start with`);
+      }
+      if (n.type === 'stealth') {
+        if (!n.path.length || !n.watch.length) err(`${nw}: empty path or watch`);
+        // perfect play must fit in time: every tile one turn, loose tiles two, every look a wait
+        let turn = 0;
+        let time = 0;
+        for (let pos = 0; pos < n.path.length; ) {
+          if (n.watch[turn % n.watch.length]) {
+            time += 1;
+          } else {
+            time += n.path[pos] ? 2 : 1;
+            pos += 1;
+          }
+          turn += 1;
+          if (turn > 500) break;
+        }
+        if (time > n.time) err(`${nw}: needs ${time} time even when played perfectly, has ${n.time}`);
+        if (n.alarm < 2) err(`${nw}: one slip must not end it (alarm ≥ 2)`);
+        for (const b of n.bonus ?? []) checkCond(nw, b.if);
+      }
+    }
 
   // Goals, NPCs, clues
   for (const g of c.goals) checkCond(`goal ${g.id}`, g.when);

@@ -5,6 +5,10 @@ import type {
   CombatOptionDef,
   Cond,
   Content,
+  DelveActDef,
+  DelveExitDef,
+  DelveMapDef,
+  DelveNode,
   Effect,
   EncounterDef,
   Gender,
@@ -16,6 +20,7 @@ import type {
   Role,
   SceneDef,
   SceneNode,
+  StealthNode,
   Text,
   TextNode,
 } from '../../../shared/src/content.js';
@@ -30,6 +35,9 @@ export const WELCOME_AFTER = 3 * 60 * 1000;
 import { cap, fill, resolveText, type Persona } from './text.js';
 
 export const LOG_LIMIT = 400;
+
+/** Hand signs players can show each other (learned from the old beekeeper). */
+export const SIGNS = ['stop', 'go', 'quiet', 'danger', 'here'];
 
 // ---------------------------------------------------------------------------
 // Content index
@@ -51,6 +59,7 @@ export class ContentIndex {
   readonly mysteries = new Map<string, Content['mysteries'][number]>();
   readonly goals = new Map<string, Content['goals'][number]>();
   readonly npcs = new Map<string, Content['npcs'][number]>();
+  readonly maps = new Map<string, DelveMapDef>();
 
   constructor(readonly c: Content) {
     for (const r of c.resources) this.res.set(r.id, r);
@@ -63,6 +72,7 @@ export class ContentIndex {
     for (const m of c.mysteries) this.mysteries.set(m.id, m);
     for (const g of c.goals) this.goals.set(g.id, g);
     for (const n of c.npcs) this.npcs.set(n.id, n);
+    for (const m of c.maps ?? []) this.maps.set(m.id, m);
   }
 
   entry(id: string): Entry | null {
@@ -708,6 +718,196 @@ export class Game {
     } else {
       sc.combat = null;
     }
+    if (n.type === 'delve') this.enterDelve(id, n);
+    sc.stealth = n.type === 'stealth' ? { pos: 0, turn: 0, time: 0, alarm: 0, picks: {}, lines: { p1: [], p2: [] } } : null;
+  }
+
+  // ----- descents ------------------------------------------------------------
+
+  private enterDelve(nodeId: string, n: DelveNode): void {
+    const sc = this.s.scene!;
+    const map = this.ix.maps.get(n.map)!;
+    // coming back from a story beat: carry on where the party stood
+    if (sc.delve && sc.delve.map === n.map && sc.delve.node === nodeId) {
+      sc.delve.picks = {};
+      return;
+    }
+    const start = n.starts?.find((x) => this.test(x.if))?.room ?? map.start;
+    const light = n.light + (n.bonus ?? []).reduce((sum, b) => sum + (this.test(b.if) ? b.light : 0), 0);
+    sc.delve = { map: n.map, node: nodeId, room: start, light, lightMax: light, picks: {}, lines: { p1: [], p2: [] } };
+    this.arrive(map, start);
+  }
+
+  /** The party stands in a room: it becomes known, its first finds happen. */
+  private arrive(map: DelveMapDef, roomId: string): void {
+    const room = map.rooms[roomId]!;
+    this.s.flags[`known:${map.id}:${roomId}`] = 1;
+    if (!this.flag(`found:${map.id}:${roomId}`)) {
+      this.s.flags[`found:${map.id}:${roomId}`] = 1;
+      this.apply(room.first);
+    }
+  }
+
+  delveStart(map: DelveMapDef, n: DelveNode): string {
+    return n.starts?.find((x) => this.test(x.if))?.room ?? map.start;
+  }
+
+  delveExitVisible(e: DelveExitDef): boolean {
+    return !e.visible || this.test(e.visible);
+  }
+
+  delveActVisible(map: DelveMapDef, a: DelveActDef, pid: PlayerId): boolean {
+    if (a.visible && !this.test(a.visible, pid)) return false;
+    if (a.once !== false && this.flag(`dact:${map.id}:${a.id}`)) return false;
+    return true;
+  }
+
+  delveActBlock(a: DelveActDef, pid: PlayerId): string | null {
+    const d = this.s.scene?.delve;
+    if (a.role && this.p(pid).role !== a.role) return this.ix.ui('err_wrong_role');
+    if (a.enabled && !this.test(a.enabled, pid)) return a.disabledHint ? this.render(a.disabledHint, pid) : this.ix.ui('err_not_now');
+    if (!this.hasCost(a.cost)) return this.ix.ui('err_cost');
+    if (d && (a.light ?? 0) > 0 && d.light < (a.light ?? 0)) return this.ix.ui('delve_no_light');
+    return null;
+  }
+
+  private delveSay(lt: LogText, actor?: PlayerId): void {
+    const d = this.s.scene!.delve!;
+    const text = this.renderLog(lt, actor);
+    for (const pid of this.joinedIds()) if (text[pid]) d.lines[pid].push(text[pid]!);
+  }
+
+  private delveChoose(pid: PlayerId, n: DelveNode, optId: string): Result {
+    const sc = this.s.scene!;
+    const d = sc.delve;
+    if (!d) return this.fail('err_not_now');
+    const map = this.ix.maps.get(d.map)!;
+    const room = map.rooms[d.room]!;
+
+    if (optId === 'leave') {
+      if (d.room !== this.delveStart(map, n)) return this.fail('err_not_now');
+      sc.delve = null;
+      this.goTo(n.out);
+      return OK;
+    }
+
+    if (optId.startsWith('act:')) {
+      const a = (room.acts ?? []).find((x) => `act:${x.id}` === optId);
+      if (!a || !this.delveActVisible(map, a, pid)) return this.fail('err_not_now');
+      const block = this.delveActBlock(a, pid);
+      if (block) return { ok: false, err: block };
+      d.lines = { p1: [], p2: [] };
+      this.payCost(a.cost);
+      const light = a.light ?? 0;
+      d.light -= light;
+      if (d.light > d.lightMax) d.lightMax = d.light;
+      if (a.once !== false) this.s.flags[`dact:${map.id}:${a.id}`] = 1;
+      this.delveSay(a.log, pid);
+      this.apply(a.effects, pid);
+      if (d.light <= 0) {
+        sc.delve = null;
+        this.goTo(n.dark);
+      }
+      return OK;
+    }
+
+    if (!optId.startsWith('go:')) return this.fail('err_not_now');
+    const exit = room.exits.find((e) => `go:${e.to}` === optId);
+    if (!exit || !this.delveExitVisible(exit)) return this.fail('err_not_now');
+    if (exit.enabled && !this.test(exit.enabled, pid)) return this.fail('err_not_now');
+    d.picks[pid] = optId;
+    if (!this.joinedIds().every((x) => d.picks[x] === optId)) return OK;
+
+    // both chose this way: go
+    d.picks = {};
+    d.lines = { p1: [], p2: [] };
+    d.light -= exit.light ?? 1;
+    if (exit.risk && this.rng.chance(exit.risk.p)) {
+      d.light -= exit.risk.light ?? 0;
+      if (exit.risk.hp) for (const x of this.joinedIds()) this.p(x).hp = Math.max(1, this.p(x).hp - exit.risk.hp);
+      this.delveSay(exit.risk.log);
+    }
+    d.room = exit.to;
+    this.arrive(map, exit.to);
+    if (d.light <= 0) {
+      sc.delve = null;
+      this.goTo(n.dark);
+      return OK;
+    }
+    const beat = (map.rooms[exit.to]!.enter ?? []).find((e) => !e.if || this.test(e.if));
+    if (beat) this.goTo(beat.next);
+    return OK;
+  }
+
+  // ----- slipping past watchers ------------------------------------------------
+
+  stealthLimits(n: StealthNode): { alarm: number; time: number } {
+    let alarm = n.alarm;
+    let time = n.time;
+    for (const b of n.bonus ?? []) {
+      if (!this.test(b.if)) continue;
+      alarm += b.alarm ?? 0;
+      time += b.time ?? 0;
+    }
+    return { alarm, time };
+  }
+
+  private stealthChoose(pid: PlayerId, n: StealthNode, optId: string): Result {
+    const sc = this.s.scene!;
+    const st = sc.stealth;
+    if (!st) return this.fail('err_not_now');
+    if (optId !== 'step' && optId !== 'sneak' && optId !== 'freeze') return this.fail('err_not_now');
+    if (st.picks[pid]) return this.fail('err_already_chosen');
+    st.picks[pid] = optId;
+    const ids = this.joinedIds();
+    if (!ids.every((x) => st.picks[x])) return OK;
+
+    const picks = ids.map((x) => st.picks[x]!);
+    const moving = picks.filter((x) => x !== 'freeze').length;
+    const watching = n.watch[st.turn % n.watch.length]!;
+    const loose = n.path[st.pos]!;
+    st.lines = { p1: [], p2: [] };
+    const say = (key: string) => {
+      for (const x of ids) st.lines[x].push(this.render(this.ix.ui(key), x));
+    };
+    if (watching && moving > 0) {
+      st.alarm += 2;
+      say('stealth_seen');
+    }
+    if (loose && moving > 0 && picks.includes('step')) {
+      st.alarm += 1;
+      say('stealth_noise');
+    }
+    if (moving === ids.length) {
+      st.pos += 1;
+      st.time += picks.includes('sneak') ? 2 : 1;
+      if (!watching && !(loose && picks.includes('step'))) say(picks.includes('sneak') ? 'stealth_crept' : 'stealth_moved');
+    } else {
+      st.time += 1;
+      say(moving > 0 ? 'stealth_split' : 'stealth_froze');
+    }
+    st.turn += 1;
+    st.picks = {};
+    const lim = this.stealthLimits(n);
+    if (st.alarm >= lim.alarm) {
+      sc.stealth = null;
+      this.goTo(n.lose);
+    } else if (st.pos >= n.path.length) {
+      sc.stealth = null;
+      this.goTo(n.win);
+    } else if (st.time >= lim.time) {
+      sc.stealth = null;
+      this.goTo(n.lose);
+    }
+    return OK;
+  }
+
+  /** A hand sign: the only way to say anything with wax in the ears. */
+  sign(pid: PlayerId, id: string): Result {
+    const sc = this.s.scene;
+    if (!sc || sc.paused || !SIGNS.includes(id)) return this.fail('err_not_now');
+    (sc.signs ??= {})[pid] = { id, at: this.now, turn: sc.stealth?.turn ?? -1 };
+    return OK;
   }
 
   private goTo(next: string | null | undefined, completed = true): void {
@@ -736,7 +936,7 @@ export class Game {
     if (!sc || sc.paused) return this.fail('err_not_now');
     const def = this.ix.scenes.get(sc.id)!;
     const n = this.node(def, sc.node);
-    if (n.type === 'choice' || n.type === 'combat') return this.fail('err_not_now');
+    if (n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth') return this.fail('err_not_now');
     sc.ready[pid] = true;
     if (!this.joinedIds().every((x) => sc.ready[x])) return OK;
     const tn = n as TextNode;
@@ -763,6 +963,8 @@ export class Game {
     const def = this.ix.scenes.get(sc.id)!;
     const n = this.node(def, sc.node);
     if (n.type === 'combat') return this.combatChoose(pid, n, optId);
+    if (n.type === 'delve') return this.delveChoose(pid, n, optId);
+    if (n.type === 'stealth') return this.stealthChoose(pid, n, optId);
     if (n.type !== 'choice') return this.fail('err_not_now');
     const opt = n.options.find((o) => o.id === optId);
     if (!opt || !this.optionVisible(opt, pid, sc.node)) return this.fail('err_not_now');
@@ -924,6 +1126,9 @@ export class Game {
         break;
       case 'choose':
         r = this.choose(pid, cmd.id);
+        break;
+      case 'sign':
+        r = this.sign(pid, cmd.id);
         break;
       case 'ack':
         if (cmd.what === 'welcome') p.welcome = null;

@@ -167,6 +167,8 @@ export interface LocationDef {
   base?: boolean;
   /** Area the location belongs to (default: the first area). Players see only their area. */
   area?: string;
+  /** A shared piece of work shown as a bar: the flag counts up to max. */
+  progress?: { flag: string; max: number; label: string };
 }
 
 /** A place players can be in. `where` is the locative form for texts ("у Ясенці"). */
@@ -230,7 +232,107 @@ export interface CombatNode extends NodeBase {
   lose: string;
 }
 
-export type SceneNode = TextNode | ChoiceNode | CombatNode;
+/**
+ * Exploring a map underground, both players together, with a limited light. Each step costs light;
+ * the party moves when both pick the same way. Each role notices different things about the ways
+ * (the hunter feels the air, the maker reads the stone). Rooms remember being found, and one-time
+ * finds stay found, so a failed descent still teaches the map.
+ */
+export interface DelveNode extends NodeBase {
+  type: 'delve';
+  map: string;
+  light: number;
+  /** Extra light while a condition holds (a better lamp…). */
+  bonus?: Array<{ if: Cond; light: number }>;
+  /** Start somewhere else once something has been reached (first match). */
+  starts?: Array<{ if: Cond; room: string }>;
+  /** Walking out of the start room. */
+  out: string | null;
+  /** The light gives out. */
+  dark: string | null;
+}
+
+/**
+ * Slipping past watchers: a path of tiles, a rhythm of looks. Only the hunter sees when the
+ * watchers look; only the maker sees which stones are loose. Each turn both pick: step, creep
+ * (silent but slow) or freeze. Moving while watched, or stepping on loose stones, raises the alarm.
+ */
+export interface StealthNode extends NodeBase {
+  type: 'stealth';
+  /** Tiles to cross; true = loose stones. */
+  path: boolean[];
+  /** The watchers' heads, turn after turn (repeats); true = looking this way. */
+  watch: boolean[];
+  /** Caught when the alarm reaches this. */
+  alarm: number;
+  /** Extra slack while a condition holds. */
+  bonus?: Array<{ if: Cond; alarm?: number; time?: number }>;
+  /** Time before the earplugs give out (a creep takes two). */
+  time: number;
+  /** What each role perceives: the watchers' heads, the stones underfoot. */
+  sees: { watching: Text; away: Text; loose: Text; firm: Text };
+  win: string;
+  lose: string;
+}
+
+export type SceneNode = TextNode | ChoiceNode | CombatNode | DelveNode | StealthNode;
+
+export interface DelveExitDef {
+  to: string;
+  label: Text;
+  visible?: Cond;
+  enabled?: Cond;
+  disabledHint?: Text;
+  /** Light it takes (default 1). */
+  light?: number;
+  /** What each role notices about this way. */
+  hunter?: Text;
+  maker?: Text;
+  /** The hunter feels air moving this way. */
+  draft?: boolean;
+  /** Bad stone: on a roll, it costs extra light or strength. The maker sees it coming. */
+  risk?: { p: number; light?: number; hp?: number; log: LogText };
+}
+
+export interface DelveActDef {
+  id: string;
+  label: Text;
+  role?: Role;
+  visible?: Cond;
+  enabled?: Cond;
+  disabledHint?: Text;
+  /** Once in the whole world (default true). */
+  once?: boolean;
+  /** Light it takes; negative gives light. */
+  light?: number;
+  cost?: Record<string, number>;
+  effects?: Effect[];
+  log: LogText;
+  /** What it gives, for the label (else derived from effects). */
+  gives?: Text;
+}
+
+export interface DelveRoomDef {
+  name: string;
+  /** Grid position for the map drawing. */
+  pos: [number, number];
+  text: Paras;
+  hunter?: Paras;
+  maker?: Paras;
+  /** Effects the first time anyone enters. */
+  first?: Effect[];
+  exits: DelveExitDef[];
+  acts?: DelveActDef[];
+  /** Entering leaves the map for a scene node (first match); the map resumes when it comes back. */
+  enter?: Array<{ if?: Cond; next: string }>;
+}
+
+export interface DelveMapDef {
+  id: string;
+  name: string;
+  start: string;
+  rooms: Record<string, DelveRoomDef>;
+}
 
 export interface SceneDef {
   id: string;
@@ -286,6 +388,8 @@ export interface EncounterDef {
   enemyMissLog?: LogText;
   /** The fight is lost if it drags on this long (default 15 rounds). */
   maxRounds?: number;
+  /** Names of the two bars when they mean something else (e.g. a book catching fire). */
+  bars?: { hp?: string; fear?: string };
 }
 
 export interface ClueDef {
@@ -397,6 +501,7 @@ export interface Content {
   npcs: NpcDef[];
   stove: StoveDef;
   ambient?: AmbientDef;
+  maps?: DelveMapDef[];
   /** Applied every time a new day starts (after a supper). */
   daily?: DailyDef[];
   start: {

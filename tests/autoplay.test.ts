@@ -12,15 +12,15 @@ const combos: Array<[string, BotOptions, BotOptions]> = [
   ['impatient + declines', { choice: 'random', combat: 'smart', seed: 11, impatient: true, declineRate: 0.3 }, { choice: 'random', combat: 'smart', seed: 12, declineRate: 0.3 }],
 ];
 
-describe('two-bot autoplay through acts 1–3', () => {
+describe('two-bot autoplay through acts 1–4', () => {
   const visitedScenes = new Set<string>();
   const finalFlags = new Set<string>();
 
   for (const [name, a, b] of combos) {
-    it(`reaches the end of act 3: ${name}`, () => {
-      const r = autoplay(a, b, { seed: a.seed * 31 + 7, maxSteps: 40000 });
+    it(`reaches the end of act 4: ${name}`, () => {
+      const r = autoplay(a, b, { seed: a.seed * 31 + 7 });
       if (!r.done) throw new Error(`Stuck (${r.reason}) after ${r.steps} steps:\n${dump(r.world)}`);
-      expect(r.world.state.meta.actDone).toBe(3);
+      expect(r.world.state.meta.actDone).toBe(4);
       expect(r.world.state.scene).toBeNull();
       r.scenes.forEach((s) => visitedScenes.add(s));
       Object.keys(r.world.state.flags).forEach((f) => finalFlags.add(f));
@@ -29,22 +29,21 @@ describe('two-bot autoplay through acts 1–3', () => {
 
   for (let seed = 100; seed < 112; seed++) {
     it(`random seed ${seed}`, () => {
-      const r = autoplay({ choice: 'random', combat: 'smart', seed }, { choice: 'random', combat: seed % 2 ? 'weak' : 'smart', seed: seed + 1000 }, { seed, maxSteps: 40000 });
+      const r = autoplay({ choice: 'random', combat: 'smart', seed }, { choice: 'random', combat: seed % 2 ? 'weak' : 'smart', seed: seed + 1000 }, { seed });
       if (!r.done) throw new Error(`Stuck (${r.reason}):\n${dump(r.world)}`);
       r.scenes.forEach((s) => visitedScenes.add(s));
       Object.keys(r.world.state.flags).forEach((f) => finalFlags.add(f));
     });
   }
 
-  it('after act 3 ends the world stays playable: routine, travel and suppers keep working', () => {
+  it('after act 4 ends the world stays playable: routine, travel and suppers keep working', () => {
     let endDay = 0;
     let trips = 0;
     let lastAt = '';
     const r = autoplay({ choice: 'random', combat: 'smart', seed: 41 }, { choice: 'random', combat: 'smart', seed: 42 }, {
       seed: 41,
-      maxSteps: 30000,
       until: (x) => {
-        if (!endDay && x.state.flags['done:scn_75']) endDay = x.state.meta.day;
+        if (!endDay && x.state.flags['done:scn_93']) endDay = x.state.meta.day;
         const at = x.state.players.p1.at;
         if (endDay && at !== lastAt) trips++;
         lastAt = at;
@@ -53,7 +52,7 @@ describe('two-bot autoplay through acts 1–3', () => {
     });
     if (!r.done) throw new Error(`Stuck after act end (${r.reason}):\n${dump(r.world)}`);
     r.scenes.forEach((s) => visitedScenes.add(s));
-    expect(r.world.state.meta.actDone).toBe(3);
+    expect(r.world.state.meta.actDone).toBe(4);
   });
 
   it('distrust path: without the ferry they cross on a raft', () => {

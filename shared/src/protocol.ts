@@ -10,7 +10,9 @@ export type Command =
   | { c: 'next' }
   | { c: 'choose'; id: string }
   /** Close a one-time panel: the return summary or the end-of-act summary. */
-  | { c: 'ack'; what: 'welcome' | 'summary' };
+  | { c: 'ack'; what: 'welcome' | 'summary' }
+  /** A hand sign to the partner during a scene. */
+  | { c: 'sign'; id: string };
 
 export type ClientMsg =
   | { t: 'hello'; token: string }
@@ -87,6 +89,8 @@ export interface GroupView {
   desc: string;
   base: boolean;
   entries: EntryView[];
+  /** A shared piece of work in progress. */
+  progress?: { label: string; n: number; max: number };
   /** What only the partner's role can do here (read-only, so the two can plan together). */
   partner?: MateEntryView[];
 }
@@ -149,11 +153,11 @@ export interface SceneView {
   id: string;
   title: string;
   /** Sound and light of the scene: by the fire, a fight, or the story itself. */
-  mood: 'hearth' | 'fight' | 'story';
+  mood: 'hearth' | 'fight' | 'story' | 'deep';
   paused: boolean;
   pausedText?: string;
   blocks: SceneBlock[];
-  kind: 'text' | 'choice' | 'combat';
+  kind: 'text' | 'choice' | 'combat' | 'delve' | 'stealth';
   mode?: 'joint' | 'each' | 'any';
   button?: string;
   options?: OptionView[];
@@ -169,7 +173,72 @@ export interface SceneView {
     fearMax: number;
     round: number;
     lastRound: string[];
+    /** Bar names when they mean something else than strength and fear. */
+    hpLabel?: string;
+    fearLabel?: string;
   };
+  delve?: DelveView;
+  stealth?: StealthView;
+  /** Hand signs: mine and the partner's latest. */
+  signs?: { mine?: string; partner?: string; fresh: boolean };
+}
+
+export interface DelveRoomView {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  here: boolean;
+  /** Not been there yet: only seen as a way leading somewhere. */
+  unknown: boolean;
+}
+
+export interface DelveView {
+  map: string;
+  room: string;
+  /** The room as everyone sees it, and what only this player notices. */
+  text: string[];
+  own: string[];
+  light: number;
+  lightMax: number;
+  rooms: DelveRoomView[];
+  links: Array<[string, string]>;
+  exits: Array<{
+    id: string;
+    to: string;
+    label: string;
+    light: number;
+    /** What this player notices about the way (their role only). */
+    note?: string;
+    tone?: 'warn' | 'lead';
+    enabled: boolean;
+    reason?: string;
+    mine: boolean;
+    partner: boolean;
+    known: boolean;
+  }>;
+  acts: Array<{ id: string; label: string; light: number; enabled: boolean; reason?: string; gives?: string }>;
+  canLeave: boolean;
+  lines: string[];
+}
+
+export interface StealthView {
+  pos: number;
+  length: number;
+  alarm: number;
+  alarmMax: number;
+  time: number;
+  timeMax: number;
+  /** What this player perceives now and on the next turn (their role only). */
+  now?: string;
+  next?: string;
+  /** Which tiles this player knows to be loose (maker), or nothing. */
+  loose?: boolean[];
+  /** Whether the watchers look now / on the next turn (hunter), or nothing. */
+  look?: { now: boolean; next: boolean };
+  myPick?: string;
+  partnerPicked: boolean;
+  lines: string[];
 }
 
 export interface ProposalView {

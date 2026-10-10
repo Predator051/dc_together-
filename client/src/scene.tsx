@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { PlayerView, SceneView } from '../../shared/src/protocol.js';
 import { net } from './net.js';
+import { DelveBody, DelveFoot, StealthBody, StealthFoot } from './delve.js';
 import { IconCheck, IconChevron } from './icons.js';
+import { sound } from './sound.js';
 import { T } from './strings.js';
 
 function Bar({ value, max, kind }: { value: number; max: number; kind: string }) {
@@ -18,6 +20,25 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
   const bodyRef = useRef<HTMLDivElement>(null);
   const blocksCount = sc.blocks.length;
   const lastRound = sc.combat?.round ?? 0;
+  const room = sc.delve?.room ?? '';
+  const stealthPos = sc.stealth ? `${sc.stealth.pos}:${sc.stealth.time}` : '';
+  const alarm = sc.stealth?.alarm ?? 0;
+
+  // Underground: steps when the party moves on, a heartbeat when the alarm rises.
+  const prevRoom = useRef(room);
+  useEffect(() => {
+    if (room && prevRoom.current && room !== prevRoom.current) {
+      sound.beat('walk', false);
+      window.setTimeout(() => sound.beat('walk', false), 450);
+    }
+    prevRoom.current = room;
+  }, [room]);
+  const prevAlarm = useRef(alarm);
+  useEffect(() => {
+    if (alarm > prevAlarm.current) sound.beat('heart', false);
+    else if (sc.stealth && stealthPos) sound.beat('walk', false);
+    prevAlarm.current = alarm;
+  }, [stealthPos]);
 
   useEffect(() => {
     setMin(false);
@@ -26,9 +47,9 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
-    const last = el.querySelector('.block:last-child');
+    const last = el.querySelector('.delve, .stealth') ?? el.querySelector('.block:last-child');
     if (last) (last as HTMLElement).scrollIntoView({ block: 'start', behavior: 'smooth' });
-  }, [blocksCount, lastRound]);
+  }, [blocksCount, lastRound, room]);
 
   if (min || (sc.paused && min)) {
     return (
@@ -54,8 +75,10 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
           )}
         </header>
         <div class="scene-body" ref={bodyRef}>
-          {sc.blocks.map((b, i) => (
-            <div class={`block ${i === sc.blocks.length - 1 ? 'current' : 'past'}`} key={i}>
+          {sc.blocks.map((b, i) => {
+            if (!b.text.length && !b.own.length && !b.combat?.length && !b.picks) return null;
+            return (
+            <div class={`block ${i === sc.blocks.length - 1 && !sc.delve && !sc.stealth ? 'current' : 'past'}`} key={i}>
               {b.text.map((p) => (
                 <p>{p}</p>
               ))}
@@ -81,7 +104,10 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
               )}
               {b.picks && <div class="picks">{b.picks}</div>}
             </div>
-          ))}
+            );
+          })}
+          {sc.delve && <DelveBody d={sc.delve} title={sc.title} />}
+          {sc.stealth && <StealthBody st={sc.stealth} v={v} />}
           {sc.combat && (
             <div class="combat">
               <div class="combat-row">
@@ -91,11 +117,11 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
                 </span>
               </div>
               <div class="combat-row">
-                <span class="small">{T.combatEnemy}</span>
+                <span class="small">{sc.combat.hpLabel ?? T.combatEnemy}</span>
                 <Bar value={sc.combat.hp} max={sc.combat.hpMax} kind="hp" />
               </div>
               <div class="combat-row">
-                <span class="small">{T.combatFear}</span>
+                <span class="small">{sc.combat.fearLabel ?? T.combatFear}</span>
                 <Bar value={sc.combat.fear} max={sc.combat.fearMax} kind="fear" />
               </div>
               <div class="combat-row">
@@ -124,7 +150,9 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
               {sc.button ?? T.next}
             </button>
           )}
-          {!sc.paused && sc.kind !== 'text' && (
+          {!sc.paused && sc.kind === 'delve' && sc.delve && <DelveFoot d={sc.delve} v={v} locked={locked} />}
+          {!sc.paused && sc.kind === 'stealth' && sc.stealth && <StealthFoot sc={sc} st={sc.stealth} v={v} locked={locked} />}
+          {!sc.paused && sc.kind !== 'text' && sc.kind !== 'delve' && sc.kind !== 'stealth' && (
             <div class="options">
               {sc.partnerPicked && !sc.myPick && <p class="partner-picked">
                   <IconCheck />
