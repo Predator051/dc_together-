@@ -1781,7 +1781,7 @@ mark {
 }
 
 /* ---------- shared work: a bar under the place's name ---------- */
-.work {
+.progress {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1790,24 +1790,24 @@ mark {
   font-size: 0.86rem;
   color: var(--faded);
 }
-.work-bar {
+.progress-bar {
   flex: 1;
   height: 6px;
   border-radius: 3px;
   background: rgba(230, 217, 188, 0.08);
   overflow: hidden;
 }
-.work-bar > span {
+.progress-bar > span {
   display: block;
   height: 100%;
   background: var(--ochre);
   transition: width 0.5s ease;
 }
-.work b {
+.progress b {
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
-.work.done .work-bar > span {
+.progress.done .progress-bar > span {
   background: var(--verdigris);
 }
 

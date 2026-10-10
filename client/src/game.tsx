@@ -230,9 +230,9 @@ function Group({ g, c }: { g: GroupView; c: Ctx }) {
         <h3>{g.name}</h3>
         {g.desc && <p class="desc">{g.desc}</p>}
         {g.progress && (
-          <div class={`work ${g.progress.n >= g.progress.max ? 'done' : ''}`}>
-            <span class="work-label">{g.progress.label}</span>
-            <span class="work-bar" aria-hidden="true">
+          <div class={`progress ${g.progress.n >= g.progress.max ? 'done' : ''}`}>
+            <span class="progress-label">{g.progress.label}</span>
+            <span class="progress-bar" aria-hidden="true">
               <span style={{ width: `${(g.progress.n / g.progress.max) * 100}%` }} />
             </span>
             <b>
