@@ -1,6 +1,6 @@
 // Underground: the map with its light, the ways each role reads differently, slipping past the
 // watchers, and hand signs (with wax in the ears nobody hears anybody).
-import type { DelveView, PlayerView, SceneView, StealthView } from '../../shared/src/protocol.js';
+import type { DelveView, OperationView, PlayerView, SceneView, StealthView } from '../../shared/src/protocol.js';
 import { IconCheck, IconFlame } from './icons.js';
 import { net } from './net.js';
 import { T } from './strings.js';
@@ -267,6 +267,73 @@ export function StealthFoot({ sc, st, v, locked }: { sc: SceneView; st: StealthV
         ))}
       </div>
       {st.myPick && !st.partnerPicked && <p class="muted waiting">{T.waiting}</p>}
+    </div>
+  );
+}
+
+/** Two fronts at once: the bars, the turn, what happened. */
+export function OperationBody({ op, v }: { op: OperationView; v: PlayerView }) {
+  return (
+    <div class="operation">
+      <div class="op-turn">
+        {T.opTurn} {Math.min(op.turn + 1, op.turns)} / {op.turns}
+      </div>
+      <div class="op-tracks">
+        {op.tracks.map((t) => (
+          <div class={`op-track ${t.bad ? 'bad' : ''} ${t.goal !== undefined && t.value >= t.goal ? 'done' : ''}`}>
+            <span class="op-label">{t.label}</span>
+            <span class="op-bar" aria-hidden="true">
+              <span style={{ width: `${Math.min(100, (t.value / t.max) * 100)}%` }} />
+              {t.goal !== undefined && <i style={{ left: `${(t.goal / t.max) * 100}%` }} />}
+            </span>
+            <b>
+              {t.value}
+              <small>/{t.goal ?? t.max}</small>
+            </b>
+          </div>
+        ))}
+      </div>
+      {op.lines.length > 0 && (
+        <div class="delve-lines">
+          {op.lines.map((l) => (
+            <p>{l}</p>
+          ))}
+        </div>
+      )}
+      {op.partnerPicked && !op.myPick && <p class="partner-picked">{v.partner.name} — ✓</p>}
+    </div>
+  );
+}
+
+export function OperationFoot({ sc, op, v, locked }: { sc: SceneView; op: OperationView; v: PlayerView; locked: boolean }) {
+  const name = new Map(op.tracks.map((t) => [t.id, t.label]));
+  const effects = (m: OperationView['moves'][number]): string[] => {
+    const out: string[] = [];
+    for (const [k, d] of Object.entries(m.delta)) if (d) out.push(`${name.get(k) ?? k} ${d > 0 ? '+' : '−'}${Math.abs(d)}`);
+    if (m.transfer) out.push(`${name.get(m.transfer.from) ?? m.transfer.from} → ${name.get(m.transfer.to) ?? m.transfer.to}: до ${m.transfer.n}`);
+    for (const c of m.cost ?? []) out.push(`−${c.n} ${c.name}`);
+    return out;
+  };
+  return (
+    <div class="op-foot">
+      <Signs sc={sc} v={v} locked={locked} />
+      <div class="options">
+        {op.moves.map((m) => (
+          <button
+            class={`opt ${op.myPick === m.id ? 'on' : ''}`}
+            disabled={!m.enabled || locked || !!op.myPick}
+            onClick={() => net.send({ c: 'choose', id: m.id })}
+          >
+            <span class="opt-body">
+              <span>{m.label}</span>
+              <em class="way-note">{effects(m).join(' · ')}</em>
+              {m.reason && <em class="reason">{m.reason}</em>}
+            </span>
+            {op.myPick === m.id && <IconCheck />}
+          </button>
+        ))}
+      </div>
+      {op.myPick && !op.partnerPicked && <p class="muted waiting">{T.waiting}</p>}
     </div>
   );
 }

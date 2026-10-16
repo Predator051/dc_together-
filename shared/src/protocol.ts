@@ -157,7 +157,7 @@ export interface SceneView {
   paused: boolean;
   pausedText?: string;
   blocks: SceneBlock[];
-  kind: 'text' | 'choice' | 'combat' | 'delve' | 'stealth';
+  kind: 'text' | 'choice' | 'combat' | 'delve' | 'stealth' | 'operation';
   mode?: 'joint' | 'each' | 'any';
   button?: string;
   options?: OptionView[];
@@ -179,6 +179,7 @@ export interface SceneView {
   };
   delve?: DelveView;
   stealth?: StealthView;
+  operation?: OperationView;
   /** Hand signs: mine and the partner's latest. */
   signs?: { mine?: string; partner?: string; fresh: boolean };
 }
@@ -219,6 +220,25 @@ export interface DelveView {
   }>;
   acts: Array<{ id: string; label: string; light: number; enabled: boolean; reason?: string; gives?: string }>;
   canLeave: boolean;
+  lines: string[];
+}
+
+export interface OperationView {
+  turn: number;
+  turns: number;
+  tracks: Array<{ id: string; label: string; value: number; max: number; bad: boolean; goal?: number }>;
+  moves: Array<{
+    id: string;
+    label: string;
+    enabled: boolean;
+    reason?: string;
+    /** What it does, for the label and for planning: track id → change. */
+    delta: Record<string, number>;
+    transfer?: { from: string; to: string; n: number };
+    cost?: CostView[];
+  }>;
+  myPick?: string;
+  partnerPicked: boolean;
   lines: string[];
 }
 
@@ -312,6 +332,8 @@ export interface WelcomeView {
 /** End-of-act summary: numbers only, no story. */
 export interface SummaryView {
   act: number;
+  /** The story has reached an ending: the numbers cover the whole game. */
+  final: boolean;
   days: number;
   places: number;
   clues: number;

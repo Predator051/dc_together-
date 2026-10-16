@@ -68,6 +68,7 @@ export interface SceneState {
   /** A descent in progress (kept while the scene steps out for a story beat and comes back). */
   delve?: DelveState | null;
   stealth?: StealthState | null;
+  operation?: OperationState | null;
   /** The last hand sign each player showed (in earplugs nobody hears anybody). */
   signs?: Partial<Record<PlayerId, { id: string; at: number; turn: number }>>;
 }
@@ -81,6 +82,13 @@ export interface DelveState {
   /** Way each player wants to go: `go:<room>`. */
   picks: Partial<Record<PlayerId, string>>;
   /** What happened last, per player. */
+  lines: Record<PlayerId, string[]>;
+}
+
+export interface OperationState {
+  turn: number;
+  tracks: Record<string, number>;
+  picks: Partial<Record<PlayerId, string>>;
   lines: Record<PlayerId, string[]>;
 }
 

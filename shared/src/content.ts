@@ -63,7 +63,7 @@ export type EffectTarget = 'actor' | 'both' | Role;
 export type Effect =
   | { set: string; value?: number }
   | { unset: string }
-  | { inc: string; by?: number }
+  | { inc: string; by?: number; max?: number }
   | { pset: string; who?: EffectTarget; value?: number }
   | { add: Record<string, number> }
   | { take: Record<string, number> }
@@ -275,7 +275,55 @@ export interface StealthNode extends NodeBase {
   lose: string;
 }
 
-export type SceneNode = TextNode | ChoiceNode | CombatNode | DelveNode | StealthNode;
+/** A counter shown as a bar during an operation. */
+export interface OperationTrackDef {
+  id: string;
+  label: string;
+  max: number;
+  start?: number;
+  /** Kept in this world flag: read at the start, written every turn (survives a failed attempt). */
+  flag?: string;
+  /** Rising is bad; reaching max fails the operation. */
+  bad?: boolean;
+}
+
+export interface OperationMoveDef {
+  id: string;
+  label: Text;
+  role?: Role;
+  visible?: Cond;
+  enabled?: Cond;
+  disabledHint?: Text;
+  cost?: Record<string, number>;
+  /** Change of tracks. */
+  delta?: Record<string, number>;
+  /** Move up to n from one track to another (e.g. awake people → out). */
+  transfer?: { from: string; to: string; n: number };
+  /** Extra while a condition holds. */
+  bonus?: Array<{ if: Cond; delta?: Record<string, number>; n?: number }>;
+  log: LogText;
+}
+
+/**
+ * Two fronts at once: every turn both pick a move (each from their own set), the world pushes back
+ * (events), the bars show where things stand. A bad bar reaching its max fails; when the turns run
+ * out, the win track decides.
+ */
+export interface OperationNode extends NodeBase {
+  type: 'operation';
+  turns: number;
+  tracks: OperationTrackDef[];
+  moves: OperationMoveDef[];
+  /** What the world does after both moves (from turn `from`, every `every` turns). */
+  events: Array<{ from?: number; every?: number; delta: Record<string, number>; text: Text; if?: Cond }>;
+  win: { track: string; gte: number; next: string };
+  /** The turns ran out short of the win. */
+  lose: string;
+  /** A bad track reached its max. */
+  fail: string;
+}
+
+export type SceneNode = TextNode | ChoiceNode | CombatNode | DelveNode | StealthNode | OperationNode;
 
 export interface DelveExitDef {
   to: string;

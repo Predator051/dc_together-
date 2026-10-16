@@ -54,6 +54,11 @@ npm run typecheck
   взглядов, видит Ловець), `alarm`, `time`, `bonus[]`, `sees` (тексты), `win`/`lose`. Каждый ход оба
   выбирают `step` / `sneak` (тихо, но время ×2) / `freeze`. Взгляд + движение — тревога +2, обычный
   шаг по сипкому — +1. Валидатор проверяет, что идеальная игра укладывается во время.
+- **Узел `operation`** (два фронта): `turns`, `tracks[]` (`max`, `flag` — значение живёт во флаге мира
+  и пишется каждый ход, `bad` — дошла до `max` → `fail`), `moves[]` (`role`, `visible`, `enabled`,
+  `cost`, `delta`, `transfer {from,to,n}` — перелить до `n` из одной шкалы в другую, `bonus[] {if, delta?, n?}`,
+  `log`), `events[]` (`from`, `every`, `if`, `delta`, `text`). Каждый ход оба выбирают ход; в конце —
+  `win {track, gte, next}`, иначе `lose`. Валидатор требует у каждой роли всегда доступный ход.
 - **Знаки руками**: команда `sign` (`stop|go|quiet|danger|here`) в любой сцене; в виде — свой и
   свежий знак напарника (в `stealth` — показанный в этот ход).
 - **LocationDef.progress** `{flag, max, label}` — общая работа с полосой прогресса в карточке места.
@@ -72,7 +77,7 @@ npm run typecheck
 `role`, `clue` (у смотрящего), `anyClue`, `partnerJoined`, `partnerOnline`, `stove`, `rel`,
 `all`/`any`/`not`.
 
-Эффекты: `set`, `unset`, `inc`, `pset` (`who: actor|both|hunter|maker`), `add`, `take`, `clue`,
+Эффекты: `set`, `unset`, `inc` (`by`, `max`), `pset` (`who: actor|both|hunter|maker`), `add`, `take`, `clue`,
 `log`, `mystery` (поднять уровень), `rel`, `meet`, `scene` (только из сцен — цепочка),
 `advanceDay`, `heal`, `stove`, `actDone`, `startAct`, `moveTo` (`who`), `if/then/else`.
 Условия мест: `at`, `partnerAt`.

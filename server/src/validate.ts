@@ -66,6 +66,7 @@ function nodeTargets(n: SceneNode): Array<string | null | undefined> {
   if (n.type === 'choice') return [...n.options.map((o) => o.next), n.mismatch, n.next];
   if (n.type === 'combat') return [n.win, n.lose];
   if (n.type === 'stealth') return [n.win, n.lose];
+  if (n.type === 'operation') return [n.win.next, n.lose, n.fail];
   if (n.type === 'delve') {
     const beats = Object.values(MAPS.get(n.map)?.rooms ?? {}).flatMap((r) => (r.enter ?? []).map((e) => e.next));
     return [n.out, n.dark, ...beats];
@@ -75,6 +76,10 @@ function nodeTargets(n: SceneNode): Array<string | null | undefined> {
 
 function nodeEffects(n: SceneNode): Effect[] {
   const list = [...(n.effects ?? [])];
+  if (n.type === 'operation') {
+    // tracks kept in flags are written by the operation itself
+    for (const t of n.tracks) if (t.flag) list.push({ inc: t.flag, by: 0 });
+  }
   if (n.type === 'delve')
     for (const r of Object.values(MAPS.get(n.map)?.rooms ?? {})) {
       list.push(...(r.first ?? []));
@@ -412,6 +417,33 @@ export function validateContent(c: Content): Report {
         }
         for (const b of n.bonus ?? []) checkCond(nw, b.if);
         if (n.light < 1) err(`${nw}: no light to start with`);
+      }
+      if (n.type === 'operation') {
+        const ids = new Set(n.tracks.map((t) => t.id));
+        const known = (k: string) => ids.has(k) || err(`${nw}: unknown track ${k}`);
+        if (!ids.has(n.win.track)) err(`${nw}: unknown win track`);
+        if (!n.tracks.some((t) => t.bad)) warnings.push(`${nw}: nothing can go wrong`);
+        const moveIds = new Set<string>();
+        for (const m of n.moves) {
+          if (moveIds.has(m.id)) err(`${nw}: duplicate move ${m.id}`);
+          moveIds.add(m.id);
+          Object.keys(m.delta ?? {}).forEach(known);
+          if (m.transfer) [m.transfer.from, m.transfer.to].forEach(known);
+          for (const b of m.bonus ?? []) {
+            checkCond(nw, b.if);
+            Object.keys(b.delta ?? {}).forEach(known);
+          }
+          checkCond(nw, m.visible);
+          checkCond(nw, m.enabled);
+          checkCost(`${nw}.${m.id}`, m.cost);
+        }
+        for (const role of ['hunter', 'maker'] as const)
+          if (!n.moves.some((m) => (!m.role || m.role === role) && !m.visible && !m.enabled && !m.cost))
+            err(`${nw}: the ${role} needs a move that is always available`);
+        for (const ev of n.events) {
+          Object.keys(ev.delta).forEach(known);
+          checkCond(nw, ev.if);
+        }
       }
       if (n.type === 'stealth') {
         if (!n.path.length || !n.watch.length) err(`${nw}: empty path or watch`);

@@ -100,6 +100,7 @@ export const T = {
   ok: 'Добре',
 
   summaryTitle: 'Підсумок',
+  summaryFinal: 'Підсумок усієї історії',
   act1: 'першої дії',
   act2: 'другої дії',
   act3: 'третьої дії',
@@ -150,6 +151,7 @@ export const T = {
   signQuiet: 'Тихо',
   signDanger: 'Небезпека',
   signHere: 'Сюди',
+  opTurn: 'Хід',
 };
 
 export type Strings = typeof T;

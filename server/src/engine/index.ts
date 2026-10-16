@@ -19,6 +19,8 @@ import type {
   PoolActionDef,
   Role,
   SceneDef,
+  OperationMoveDef,
+  OperationNode,
   SceneNode,
   StealthNode,
   Text,
@@ -368,7 +370,8 @@ export class Game {
       return;
     }
     if ('inc' in e) {
-      this.s.flags[e.inc] = this.flag(e.inc) + (e.by ?? 1);
+      const v = this.flag(e.inc) + (e.by ?? 1);
+      this.s.flags[e.inc] = e.max !== undefined ? Math.min(e.max, v) : v;
       return;
     }
     if ('pset' in e) {
@@ -720,6 +723,98 @@ export class Game {
     }
     if (n.type === 'delve') this.enterDelve(id, n);
     sc.stealth = n.type === 'stealth' ? { pos: 0, turn: 0, time: 0, alarm: 0, picks: {}, lines: { p1: [], p2: [] } } : null;
+    if (n.type === 'operation') {
+      const tracks: Record<string, number> = {};
+      for (const t of n.tracks) tracks[t.id] = Math.min(t.max, t.flag ? this.flag(t.flag) : (t.start ?? 0));
+      sc.operation = { turn: 0, tracks, picks: {}, lines: { p1: [], p2: [] } };
+    } else sc.operation = null;
+  }
+
+  // ----- operations: two fronts at once ----------------------------------------
+
+  operationMoves(n: OperationNode, pid: PlayerId): OperationMoveDef[] {
+    return n.moves.filter((m) => (!m.role || m.role === this.p(pid).role) && (!m.visible || this.test(m.visible, pid)));
+  }
+
+  operationBlock(m: OperationMoveDef, pid: PlayerId): string | null {
+    if (m.enabled && !this.test(m.enabled, pid)) return m.disabledHint ? this.render(m.disabledHint, pid) : this.ix.ui('err_not_now');
+    if (!this.hasCost(m.cost)) return this.ix.ui('err_cost');
+    return null;
+  }
+
+  /** What a move would do right now (bonuses included). */
+  operationEffect(m: OperationMoveDef, pid: PlayerId): { delta: Record<string, number>; transfer?: { from: string; to: string; n: number } } {
+    const delta: Record<string, number> = { ...(m.delta ?? {}) };
+    let extra = 0;
+    for (const b of m.bonus ?? []) {
+      if (!this.test(b.if, pid)) continue;
+      for (const [k, v] of Object.entries(b.delta ?? {})) delta[k] = (delta[k] ?? 0) + v;
+      extra += b.n ?? 0;
+    }
+    return { delta, ...(m.transfer ? { transfer: { ...m.transfer, n: m.transfer.n + extra } } : {}) };
+  }
+
+  private operationChoose(pid: PlayerId, n: OperationNode, optId: string): Result {
+    const sc = this.s.scene!;
+    const op = sc.operation;
+    if (!op) return this.fail('err_not_now');
+    const m = this.operationMoves(n, pid).find((x) => x.id === optId);
+    if (!m) return this.fail('err_not_now');
+    const block = this.operationBlock(m, pid);
+    if (block) return { ok: false, err: block };
+    if (op.picks[pid]) return this.fail('err_already_chosen');
+    op.picks[pid] = optId;
+    const ids = this.joinedIds();
+    if (!ids.every((x) => op.picks[x])) return OK;
+
+    // both have chosen: play the turn
+    op.lines = { p1: [], p2: [] };
+    const max = new Map(n.tracks.map((t) => [t.id, t.max]));
+    const clamp = (k: string) => (op.tracks[k] = Math.max(0, Math.min(max.get(k) ?? 0, op.tracks[k] ?? 0)));
+    const say = (lt: LogText, actor?: PlayerId) => {
+      const text = this.renderLog(lt, actor);
+      for (const x of ids) if (text[x]) op.lines[x].push(text[x]!);
+    };
+    for (const x of ids) {
+      const mv = this.operationMoves(n, x).find((y) => y.id === op.picks[x])!;
+      this.payCost(mv.cost);
+      const eff = this.operationEffect(mv, x);
+      for (const [k, v] of Object.entries(eff.delta)) {
+        op.tracks[k] = (op.tracks[k] ?? 0) + v;
+        clamp(k);
+      }
+      if (eff.transfer) {
+        const room = (max.get(eff.transfer.to) ?? 0) - (op.tracks[eff.transfer.to] ?? 0);
+        const moved = Math.max(0, Math.min(eff.transfer.n, op.tracks[eff.transfer.from] ?? 0, room));
+        op.tracks[eff.transfer.from] = (op.tracks[eff.transfer.from] ?? 0) - moved;
+        op.tracks[eff.transfer.to] = (op.tracks[eff.transfer.to] ?? 0) + moved;
+      }
+      say(mv.log, x);
+    }
+    op.turn += 1;
+    for (const ev of n.events) {
+      if (op.turn < (ev.from ?? 1)) continue;
+      if ((op.turn - (ev.from ?? 1)) % (ev.every ?? 1) !== 0) continue;
+      if (ev.if && !this.test(ev.if)) continue;
+      for (const [k, v] of Object.entries(ev.delta)) {
+        op.tracks[k] = (op.tracks[k] ?? 0) + v;
+        clamp(k);
+      }
+      say({ all: ev.text });
+    }
+    op.picks = {};
+    for (const t of n.tracks) if (t.flag) this.s.flags[t.flag] = op.tracks[t.id] ?? 0;
+
+    const failed = n.tracks.find((t) => t.bad && (op.tracks[t.id] ?? 0) >= t.max);
+    if (failed) {
+      sc.operation = null;
+      this.goTo(n.fail);
+    } else if (op.turn >= n.turns) {
+      const won = (op.tracks[n.win.track] ?? 0) >= n.win.gte;
+      sc.operation = null;
+      this.goTo(won ? n.win.next : n.lose);
+    }
+    return OK;
   }
 
   // ----- descents ------------------------------------------------------------
@@ -936,7 +1031,7 @@ export class Game {
     if (!sc || sc.paused) return this.fail('err_not_now');
     const def = this.ix.scenes.get(sc.id)!;
     const n = this.node(def, sc.node);
-    if (n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth') return this.fail('err_not_now');
+    if (n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth' || n.type === 'operation') return this.fail('err_not_now');
     sc.ready[pid] = true;
     if (!this.joinedIds().every((x) => sc.ready[x])) return OK;
     const tn = n as TextNode;
@@ -965,6 +1060,7 @@ export class Game {
     if (n.type === 'combat') return this.combatChoose(pid, n, optId);
     if (n.type === 'delve') return this.delveChoose(pid, n, optId);
     if (n.type === 'stealth') return this.stealthChoose(pid, n, optId);
+    if (n.type === 'operation') return this.operationChoose(pid, n, optId);
     if (n.type !== 'choice') return this.fail('err_not_now');
     const opt = n.options.find((o) => o.id === optId);
     if (!opt || !this.optionVisible(opt, pid, sc.node)) return this.fail('err_not_now');

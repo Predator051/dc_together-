@@ -396,7 +396,7 @@ function Summary({ s, me, partner }: { s: SummaryView; me: string; partner: stri
     <div class="sheet-wrap" role="dialog" aria-labelledby="summary-title">
       <section class="sheet summary">
         <h2 id="summary-title">
-          {T.summaryTitle} {ACT_NAMES[s.act] ?? s.act}
+          {s.final ? T.summaryFinal : `${T.summaryTitle} ${ACT_NAMES[s.act] ?? s.act}`}
         </h2>
         <dl class="ledger summary-ledger">
           {rows

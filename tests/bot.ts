@@ -69,6 +69,7 @@ export class Bot {
     const sc = v.scene;
     if (sc && !sc.paused && sc.kind === 'delve' && sc.delve) return this.delve(v, sc.delve);
     if (sc && !sc.paused && sc.kind === 'stealth' && sc.stealth) return this.stealth(v);
+    if (sc && !sc.paused && sc.kind === 'operation' && sc.operation) return this.operation(v);
     if (sc && !sc.paused) {
       if (sc.waiting) return null;
       if (sc.kind === 'text') return { c: 'next' };
@@ -101,14 +102,23 @@ export class Bot {
     // Remember where the shared work is (a place with a progress bar still filling up).
     const storyHere = v.groups.some((g) => g.progress && g.progress.n < g.progress.max);
     if (storyHere) this.storyArea = v.me.area;
+    else if (this.storyArea === v.me.area) this.storyArea = null; // the work here is done
     this.progressIds = new Set(v.groups.filter((g) => g.progress && g.progress.n < g.progress.max).flatMap((g) => g.entries.map((e) => e.id)));
 
     // Together scenes first (story), supper only occasionally or when nothing else is pending.
     const sig = this.signature(v);
-    const scenes = entries.filter((e) => e.kind === 'scene' && e.enabled && this.tried.get(e.id) !== sig);
+    // A scene tried again and again without finishing is put aside more and more often.
+    const scenes = entries.filter(
+      (e) =>
+        e.kind === 'scene' &&
+        e.enabled &&
+        this.tried.get(e.id) !== sig &&
+        this.rng.chance(1 / Math.max(1, (this.attempts.get(e.id) ?? 0) - 2)),
+    );
     if (scenes.length && v.partner.online) {
       const s = this.pick(scenes)!;
       this.tried.set(s.id, sig);
+      this.attempts.set(s.id, (this.attempts.get(s.id) ?? 0) + 1);
       return { c: 'act', id: s.id };
     }
 
@@ -151,7 +161,9 @@ export class Bot {
           const toward = travels.find((e) => Math.sign(order.indexOf(this.travelTo.get(e.id)!) - order.indexOf(v.me.area)) === dir);
           if (toward) return { c: 'act', id: toward.id };
         }
-        if (this.rng.chance(0.01)) return { c: 'act', id: this.rng.pick(travels).id };
+        // Nothing for the story here and no idea where it is: look around more readily.
+        const idle = !this.storyArea && !entries.some((e) => e.kind === 'scene' && e.enabled);
+        if (this.rng.chance(idle ? 0.04 : 0.01)) return { c: 'act', id: this.rng.pick(travels).id };
       }
     }
     const ready = entries.filter((e) => e.kind === 'act' && e.enabled && !(e.readyAt && e.readyAt > now));
@@ -230,6 +242,38 @@ export class Bot {
     const quiet = loose || signs.partner === 'quiet';
     return { c: 'choose', id: stop ? 'freeze' : quiet ? 'sneak' : 'step' };
   }
+
+  /**
+   * Two fronts: push the win track while it is short, keep bad tracks away from their max,
+   * move people when there are people to move.
+   */
+  private operation(v: PlayerView): Command | null {
+    const op = v.scene!.operation!;
+    if (op.myPick) return null;
+    const tracks = new Map(op.tracks.map((t) => [t.id, t]));
+    const danger = op.tracks.some((t) => t.bad && t.value >= t.max - 3);
+    const score = (m: (typeof op.moves)[number]): number => {
+      let s = this.rng.next() * 0.5;
+      for (const [k, d] of Object.entries(m.delta)) {
+        const t = tracks.get(k);
+        if (!t) continue;
+        // what the move would really change: bars stop at 0 and at their max
+        const eff = Math.max(0, Math.min(t.max, t.value + d)) - t.value;
+        if (t.bad) s -= eff * (danger ? 4 : 1);
+        else if (t.goal !== undefined && t.value < t.goal) s += eff * 3;
+        else s += eff * 0.5;
+      }
+      if (m.transfer) s += Math.min(m.transfer.n, tracks.get(m.transfer.from)?.value ?? 0) * 0.6;
+      return s;
+    };
+    const moves = op.moves.filter((m) => m.enabled);
+    if (!moves.length) return null;
+    const best = moves.reduce((a, b) => (score(b) > score(a) ? b : a));
+    return { c: 'choose', id: best.id };
+  }
+
+  /** How many times this bot proposed each scene. */
+  private attempts = new Map<string, number>();
 
   private lastSign = '';
   private signedThisTurn(pos: number, time: number): boolean {

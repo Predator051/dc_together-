@@ -31,6 +31,12 @@ import { maps } from './act4/maps.js';
 import { locations4 } from './act4/places.js';
 import { resources4 } from './act4/resources.js';
 import { scenes4 } from './act4/scenes.js';
+import { actions5 } from './act5/actions.js';
+import { encounters5 } from './act5/combat.js';
+import { clues5, goals5 } from './act5/journal.js';
+import { locations5 } from './act5/places.js';
+import { resources5 } from './act5/resources.js';
+import { scenes5 } from './act5/scenes.js';
 import { ambient } from './ambient.js';
 import { ui } from './ui.js';
 
@@ -40,16 +46,16 @@ export const content: Content = {
     { id: 'tower', name: 'Стара Сторожа', where: 'біля Старої Сторожі' },
     { id: 'kruchi', name: 'Лук\'янова печера', where: 'під Кручами' },
   ],
-  resources: [...resources, ...resources2, ...resources3, ...resources4],
-  actions: [...actions, ...actions2, ...actions3, ...actions4],
+  resources: [...resources, ...resources2, ...resources3, ...resources4, ...resources5],
+  actions: [...actions, ...actions2, ...actions3, ...actions4, ...actions5],
   pools: [...pools, ...pools2, ...pools3],
-  locations: [...locations, ...locations2, ...locations3, ...locations4],
-  scenes: [...villageScenes, ...panasScenes, ...nightScenes, ...supperScenes, ...roadScenes, ...ferryScenes, ...supperScenes2, ...hallScenes, ...homeScenes3, ...supperScenes3, ...scenes4],
-  encounters: [...encounters, ...encounters2, ...encounters3, ...encounters4],
-  clues: [...clues, ...clues2, ...clues3, ...clues4],
+  locations: [...locations, ...locations2, ...locations3, ...locations4, ...locations5],
+  scenes: [...villageScenes, ...panasScenes, ...nightScenes, ...supperScenes, ...roadScenes, ...ferryScenes, ...supperScenes2, ...hallScenes, ...homeScenes3, ...supperScenes3, ...scenes4, ...scenes5],
+  encounters: [...encounters, ...encounters2, ...encounters3, ...encounters4, ...encounters5],
+  clues: [...clues, ...clues2, ...clues3, ...clues4, ...clues5],
   mysteries: [...mysteries, ...mysteries2],
   // Later acts first: the first goal whose condition holds is shown.
-  goals: [...goals4, ...goals3, ...goals2, ...goals],
+  goals: [...goals5, ...goals4, ...goals3, ...goals2, ...goals],
   npcs: [...npcs, ...npcs2, ...npcs3, ...npcs4],
   stove: { perWood: 4 * 60 * 1000, maxWood: 6, coldPenalty: 1.5, low: 3 * 60 * 1000 },
   ambient,
@@ -61,11 +67,12 @@ export const content: Content = {
     { res: 'res_02', per: 'res_34', add: 2 },
     { flag: 'alarm', add: -1, min: 0 },
   ],
-  storyFlags: ['done:', 'seen:', 'a1_', 'a2_done', 'a2_ferry_ok', 'a2_talk_', 'a3_', 'a4_door', 'a4_savka', 'a4_guards', 'a4_book', 'a4_done', 'a4_myroslava', 'a4_hammer', 'a4_weavers', 'rescued', 'recovered', 'bell_fixed', 'night_warned', 'panas_ready', 'panas_gift'],
+  storyFlags: ['done:', 'seen:', 'a1_', 'a2_done', 'a2_ferry_ok', 'a2_talk_', 'a3_', 'a4_door', 'a4_savka', 'a4_guards', 'a4_book', 'a4_done', 'a4_myroslava', 'a4_hammer', 'a4_weavers', 'a5_started', 'a5_myroslava', 'a5_savka', 'a5_master', 'a5_final', 'a5_hunter', 'a5_done', 'a5_panas', 'ending_', 'rescued', 'recovered', 'bell_fixed', 'night_warned', 'panas_ready', 'panas_gift'],
   actEnd: {
     1: 'Кінець першої дії. Дорога на схід відкриється згодом, а поки Ясенець чекає на вас: можна й далі господарювати.',
     2: 'Кінець другої дії. Що далі — відкриється згодом. А поки Сторожа й Ясенець чекають на вас: можна господарювати й ходити між ними.',
     3: 'Кінець третьої дії. Що далі — відкриється згодом. А поки лікуйте врятованих і готуйтеся: найдовша ніч наближається.',
+    5: 'Кінець. Найдовша ніч минула. Ясенець лишається вашим — живіть у ньому, скільки захочете.',
     4: 'Кінець четвертої дії. Що далі — відкриється згодом. А поки розчищайте Вітряний колодязь, лікуйте врятованих і запасайтеся світлом: найдовша ніч уже близько.',
   },
   roleTitles: {

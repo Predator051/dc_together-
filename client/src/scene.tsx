@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { PlayerView, SceneView } from '../../shared/src/protocol.js';
 import { net } from './net.js';
-import { DelveBody, DelveFoot, StealthBody, StealthFoot } from './delve.js';
+import { DelveBody, DelveFoot, OperationBody, OperationFoot, StealthBody, StealthFoot } from './delve.js';
 import { IconCheck, IconChevron } from './icons.js';
 import { sound } from './sound.js';
 import { T } from './strings.js';
@@ -21,7 +21,7 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
   const blocksCount = sc.blocks.length;
   const lastRound = sc.combat?.round ?? 0;
   const room = sc.delve?.room ?? '';
-  const stealthPos = sc.stealth ? `${sc.stealth.pos}:${sc.stealth.time}` : '';
+  const stealthPos = sc.stealth ? `${sc.stealth.pos}:${sc.stealth.time}` : sc.operation ? `op:${sc.operation.turn}` : '';
   const alarm = sc.stealth?.alarm ?? 0;
 
   // Underground: steps when the party moves on, a heartbeat when the alarm rises.
@@ -47,9 +47,9 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
-    const last = el.querySelector('.delve, .stealth') ?? el.querySelector('.block:last-child');
+    const last = el.querySelector('.delve, .stealth, .operation') ?? el.querySelector('.block:last-child');
     if (last) (last as HTMLElement).scrollIntoView({ block: 'start', behavior: 'smooth' });
-  }, [blocksCount, lastRound, room]);
+  }, [blocksCount, lastRound, room, sc.operation?.turn]);
 
   if (min || (sc.paused && min)) {
     return (
@@ -108,6 +108,7 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
           })}
           {sc.delve && <DelveBody d={sc.delve} title={sc.title} />}
           {sc.stealth && <StealthBody st={sc.stealth} v={v} />}
+          {sc.operation && <OperationBody op={sc.operation} v={v} />}
           {sc.combat && (
             <div class="combat">
               <div class="combat-row">
@@ -152,7 +153,8 @@ export function Scene({ v, sc, locked }: { v: PlayerView; sc: SceneView; locked:
           )}
           {!sc.paused && sc.kind === 'delve' && sc.delve && <DelveFoot d={sc.delve} v={v} locked={locked} />}
           {!sc.paused && sc.kind === 'stealth' && sc.stealth && <StealthFoot sc={sc} st={sc.stealth} v={v} locked={locked} />}
-          {!sc.paused && sc.kind !== 'text' && sc.kind !== 'delve' && sc.kind !== 'stealth' && (
+          {!sc.paused && sc.kind === 'operation' && sc.operation && <OperationFoot sc={sc} op={sc.operation} v={v} locked={locked} />}
+          {!sc.paused && sc.kind !== 'text' && sc.kind !== 'delve' && sc.kind !== 'stealth' && sc.kind !== 'operation' && (
             <div class="options">
               {sc.partnerPicked && !sc.myPick && <p class="partner-picked">
                   <IconCheck />

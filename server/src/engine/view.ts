@@ -249,8 +249,8 @@ function sceneView(g: Game, pid: PlayerId): SceneView | null {
     paused: sc.paused,
     pausedText: sc.paused ? g.render(g.ix.ui('scene_paused'), pid) : undefined,
     blocks,
-    kind: n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth' ? n.type : 'text',
-    mood: n.type === 'combat' ? 'fight' : n.type === 'delve' || n.type === 'stealth' ? 'deep' : def.pool ? 'hearth' : 'story',
+    kind: n.type === 'choice' || n.type === 'combat' || n.type === 'delve' || n.type === 'stealth' || n.type === 'operation' ? n.type : 'text',
+    mood: n.type === 'combat' ? 'fight' : n.type === 'delve' || n.type === 'stealth' || n.type === 'operation' ? 'deep' : def.pool ? 'hearth' : 'story',
     partnerPicked: false,
     waiting: false,
   };
@@ -317,6 +317,38 @@ function sceneView(g: Game, pid: PlayerId): SceneView | null {
     view.partnerPicked = !!d.picks[other];
   } else if (n.type === 'stealth' && sc.stealth) {
     view.stealth = stealthView(g, pid, n);
+  } else if (n.type === 'operation' && sc.operation) {
+    const op = sc.operation;
+    view.operation = {
+      turn: op.turn,
+      turns: n.turns,
+      tracks: n.tracks.map((t) => ({
+        id: t.id,
+        label: t.label,
+        value: op.tracks[t.id] ?? 0,
+        max: t.max,
+        bad: !!t.bad,
+        ...(t.id === n.win.track ? { goal: n.win.gte } : {}),
+      })),
+      moves: g.operationMoves(n, pid).map((m) => {
+        const block = g.operationBlock(m, pid);
+        const eff = g.operationEffect(m, pid);
+        return {
+          id: m.id,
+          label: g.render(m.label, pid),
+          enabled: block === null,
+          ...(block ? { reason: block } : {}),
+          delta: eff.delta,
+          ...(eff.transfer ? { transfer: eff.transfer } : {}),
+          cost: costView(g, m.cost),
+        };
+      }),
+      ...(op.picks[pid] ? { myPick: op.picks[pid] } : {}),
+      partnerPicked: !!op.picks[other],
+      lines: op.lines[pid] ?? [],
+    };
+    view.myPick = op.picks[pid];
+    view.partnerPicked = !!op.picks[other];
   } else {
     view.button = n.type !== 'combat' && 'button' in n && n.button ? g.render(n.button, pid) : undefined;
     if (sc.ready[pid]) {
@@ -644,6 +676,7 @@ function summaryView(g: Game, pid: PlayerId): SummaryView | null {
     .map(({ id, name, n }) => ({ id, name, n }));
   return {
     act,
+    final: f.some((k) => k.startsWith('ending_')),
     days: g.s.meta.day,
     places: f.filter((k) => k.startsWith('seen:')).length,
     clues: clues.length,

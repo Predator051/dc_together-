@@ -12,15 +12,16 @@ const combos: Array<[string, BotOptions, BotOptions]> = [
   ['impatient + declines', { choice: 'random', combat: 'smart', seed: 11, impatient: true, declineRate: 0.3 }, { choice: 'random', combat: 'smart', seed: 12, declineRate: 0.3 }],
 ];
 
-describe('two-bot autoplay through acts 1–4', () => {
+describe('two-bot autoplay through acts 1–5', () => {
   const visitedScenes = new Set<string>();
   const finalFlags = new Set<string>();
 
   for (const [name, a, b] of combos) {
-    it(`reaches the end of act 4: ${name}`, () => {
+    it(`reaches an ending: ${name}`, () => {
       const r = autoplay(a, b, { seed: a.seed * 31 + 7 });
       if (!r.done) throw new Error(`Stuck (${r.reason}) after ${r.steps} steps:\n${dump(r.world)}`);
-      expect(r.world.state.meta.actDone).toBe(4);
+      expect(r.world.state.meta.actDone).toBe(5);
+      expect(Object.keys(r.world.state.flags).some((f) => f.startsWith('ending_'))).toBe(true);
       expect(r.world.state.scene).toBeNull();
       r.scenes.forEach((s) => visitedScenes.add(s));
       Object.keys(r.world.state.flags).forEach((f) => finalFlags.add(f));
@@ -36,14 +37,14 @@ describe('two-bot autoplay through acts 1–4', () => {
     });
   }
 
-  it('after act 4 ends the world stays playable: routine, travel and suppers keep working', () => {
+  it('after the ending the world stays playable: routine, travel and suppers keep working', () => {
     let endDay = 0;
     let trips = 0;
     let lastAt = '';
     const r = autoplay({ choice: 'random', combat: 'smart', seed: 41 }, { choice: 'random', combat: 'smart', seed: 42 }, {
       seed: 41,
       until: (x) => {
-        if (!endDay && x.state.flags['done:scn_93']) endDay = x.state.meta.day;
+        if (!endDay && x.state.flags['done:scn_105']) endDay = x.state.meta.day;
         const at = x.state.players.p1.at;
         if (endDay && at !== lastAt) trips++;
         lastAt = at;
@@ -52,7 +53,7 @@ describe('two-bot autoplay through acts 1–4', () => {
     });
     if (!r.done) throw new Error(`Stuck after act end (${r.reason}):\n${dump(r.world)}`);
     r.scenes.forEach((s) => visitedScenes.add(s));
-    expect(r.world.state.meta.actDone).toBe(4);
+    expect(r.world.state.meta.actDone).toBe(5);
   });
 
   it('distrust path: without the ferry they cross on a raft', () => {
@@ -79,7 +80,7 @@ describe('two-bot autoplay through acts 1–4', () => {
       'a1_panas_stays', 'a1_panas_goes', 'a1_called', 'a1_bell_rung', 'a1_door_broken', 'a1_seal_burned', 'a1_panas_with_us', 'a1_flute',
       'a2_crossing_ferry', 'a2_talk_listen', 'a2_talk_threat', 'a2_talk_deal', 'a2_watched_close', 'a2_wolves_done',
       'a3_hanna_saved', 'a3_marijka_saved', 'a3_men_saved', 'a3_beds_burned', 'a3_sample', 'a3_onysym_home', 'a3_onysym_atone',
-      'a3_onysym_left', 'a3_panas_forgiven', 'a3_panas_shunned',
+      'a3_onysym_left', 'a3_panas_forgiven', 'a3_panas_shunned', 'a5_final_now', 'a5_final_wait',
     ]) {
       expect(finalFlags.has(f), f).toBe(true);
     }

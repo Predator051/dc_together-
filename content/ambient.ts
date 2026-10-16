@@ -106,5 +106,13 @@ export const ambient: AmbientDef = {
     act_85: 'trade',
     act_86: 'build',
     act_87: 'rubble',
+    // act 5: wedges, resin bundles, the bells
+    act_90: 'carve',
+    act_94: 'carve',
+    act_91: 'rope',
+    act_95: 'rope',
+    act_96: 'rope',
+    act_92: 'forge',
+    act_97: 'send',
   },
 };
